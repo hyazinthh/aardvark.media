@@ -17,7 +17,7 @@ let initial =
         provenance = model |> Provenance.init
     }
 
-let restore (prov : Provenance) model =
+let restore prov model =
     { model with appModel = model.appModel |> Provenance.restore prov
                  provenance = prov }
 
@@ -49,7 +49,7 @@ let view (model : MModel) =
             { kind = Script; name = "treeScript"; url = "Tree.js" }
         ]
 
-    let treeData = adaptive {
+    let provenanceData = adaptive {
         let! p = model.provenance.tree
         
         let (Provenance.NodeId current) = p.Value.id
@@ -58,7 +58,7 @@ let view (model : MModel) =
         return sprintf @"{ ""current"" : ""%s"" , ""tree"" : %s }" current t
     } 
 
-    let updateChart = "provTreeData.onmessage = function (data) { update(data); };"
+    let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
 
     body [ onKeyDown KeyDown; onKeyUp KeyUp; onNodeClick NodeClick ] [
         div [] [
@@ -67,7 +67,7 @@ let view (model : MModel) =
 
             require dependencies (
                 onBoot "initChart();" (
-                    onBoot' ["provTreeData", treeData |> Mod.channel] updateChart (
+                    onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
                         Svg.svg [ clazz "rootSvg"; style "width:100%; height:200px; user-select:none" ] [                                
                             Svg.rect [ style "width:100%; height:100%; fill:#1B1C1E" ]
                         ]
