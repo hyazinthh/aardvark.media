@@ -61,16 +61,16 @@ let view (model : MModel) =
     let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
 
     body [ onKeyDown KeyDown; onKeyUp KeyUp; onNodeClick NodeClick ] [
-        div [] [
+        div [style "width:100%; height:75%"] [
             BoxSelectionApp.view model.appModel
                 |> UI.map BoxSelectionAction
+        ]
 
+        div [style "width:100%; height:25%; min-height:200px; background-color:#1B1C1E"] [
             require dependencies (
                 onBoot "initChart();" (
                     onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
-                        Svg.svg [ clazz "rootSvg"; style "width:100%; height:200px; user-select:none" ] [                                
-                            Svg.rect [ style "width:100%; height:100%; fill:#1B1C1E" ]
-                        ]
+                        Svg.svg [ clazz "rootSvg"; style "width:100%; height:100%; user-select:none" ] []
                     )
                 )
             )
