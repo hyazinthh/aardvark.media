@@ -5,10 +5,12 @@ open Aardvark.Application
 
 open BoxSelection
 open Provenance
+open Story
 
 type Action =
     | BoxSelectionAction of BoxSelectionAction
     | NodeClick          of NodeId
+    | SlideClick         of tree<Node> option
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
 
@@ -16,4 +18,5 @@ type Action =
 type Model = {
     appModel : BoxSelectionModel
     provenance : Provenance
+    story : Story
 }

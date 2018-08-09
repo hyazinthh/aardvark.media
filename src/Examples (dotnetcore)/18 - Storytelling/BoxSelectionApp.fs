@@ -195,7 +195,7 @@ let view (model : MBoxSelectionModel) =
                     style "width:65%; height: 100%; float: left;"
                 ]) scene
 
-            div [style "width:35%; height: 100%; float:right; background: #1B1C1E"] [
+            div [style "width:35%; height: 100%; float:right; overflow:auto; background: #1B1C1E"] [
                 Html.SemUi.accordion "Rendering" "configure" true [
                     RenderingParameters.view model.rendering |> UI.map RenderingAction 
                 ]  

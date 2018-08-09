@@ -8,7 +8,6 @@ open Aardvark.UI.Primitives
 open BoxSelection
 
 type Message =
-    | CameraMessage
     | Scale            of BoxId
     | Rotate           of BoxId
     | Translate        of BoxId
@@ -41,7 +40,6 @@ type Provenance = {
 module Message =
     
     let create = function
-        | BoxSelectionAction.CameraMessage _ -> CameraMessage
         | BoxSelectionAction.Scale (id, _) -> Scale id
         | BoxSelectionAction.Rotate (id, _) -> Rotate id
         | BoxSelectionAction.Translate (id, _) -> Translate id
@@ -50,7 +48,6 @@ module Message =
         | _ -> Unknown
 
     let toString = function
-        | CameraMessage -> "C"
         | Scale _       -> "S"
         | Rotate _      -> "R"
         | Translate _   -> "T"
@@ -85,8 +82,7 @@ module State =
             a.geometry = b.geometry &&
             a.transform.pose = b.transform.pose
 
-        a.view = b.view
-            |> (&&) (a.boxes.Count = b.boxes.Count)
+        a.boxes.Count = b.boxes.Count
             |> (&&) (Seq.map2 boxEqual (HMap.toSeq a.boxes) (HMap.toSeq b.boxes) |> Seq.forall id)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -205,6 +201,9 @@ module Provenance =
         { prov with tree = prov.tree 
                                 |> Tree.root
                                 |> Tree.find (fun n -> n.id = id) }
+
+    let set tree prov =
+        { prov with tree = tree }
     
     let update prov succ act =
 

@@ -15,9 +15,11 @@ module Mutable =
         let mutable __current : Aardvark.Base.Incremental.IModRef<Model.Model> = Aardvark.Base.Incremental.EqModRef<Model.Model>(__initial) :> Aardvark.Base.Incremental.IModRef<Model.Model>
         let _appModel = BoxSelection.Mutable.MBoxSelectionModel.Create(__initial.appModel)
         let _provenance = Provenance.Mutable.MProvenance.Create(__initial.provenance)
+        let _story = Story.Mutable.MStory.Create(__initial.story)
         
         member x.appModel = _appModel
         member x.provenance = _provenance
+        member x.story = _story
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Model.Model) =
@@ -26,6 +28,7 @@ module Mutable =
                 
                 BoxSelection.Mutable.MBoxSelectionModel.Update(_appModel, v.appModel)
                 Provenance.Mutable.MProvenance.Update(_provenance, v.provenance)
+                Story.Mutable.MStory.Update(_story, v.story)
                 
         
         static member Create(__initial : Model.Model) : MModel = MModel(__initial)
@@ -53,4 +56,10 @@ module Mutable =
                     override x.Get(r) = r.provenance
                     override x.Set(r,v) = { r with provenance = v }
                     override x.Update(r,f) = { r with provenance = f r.provenance }
+                }
+            let story =
+                { new Lens<Model.Model, Story.Story>() with
+                    override x.Get(r) = r.story
+                    override x.Set(r,v) = { r with story = v }
+                    override x.Update(r,f) = { r with story = f r.story }
                 }

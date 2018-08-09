@@ -1,41 +1,58 @@
-﻿var chart, linkLayer, nodeLayer, tree, rootCurr = null;
+﻿var rootSvg, svgContainer, chart, linkLayer, nodeLayer, tree;
+var rootCurr = null
+var root = null;
+var padding = 15;
+var gapLevel = 75;
 
 function initChart() {
-    chart = d3.select(".rootSvg")
-        .append("g")
-        .attr("transform", "translate(100, 10)");
+    rootSvg = document.getElementsByClassName("rootSvg")[0];
+    svgContainer = rootSvg.parentElement;
 
+    chart = d3.select(".rootSvg");
     linkLayer = chart.append("g");
     nodeLayer = chart.append("g");
 
-    tree = d3.tree()
-        .size([200, 200]);
+    tree = d3.tree();
+
+    window.addEventListener("resize", redraw);
+}
+
+function getX(x) {
+    return padding + x;
+}
+
+function getY(y) {
+    return padding + y * (svgContainer.clientHeight - padding * 2); 
+}
+
+function getWidth(x) {
+    return x + 2 * padding;
 }
 
 function diagonal(d) {
-    return "M" + d.y + "," + d.x
-        + "C" + (d.y + d.parent.y) / 2 + "," + d.x
-        + " " + (d.y + d.parent.y) / 2 + "," + d.parent.x
-        + " " + d.parent.y + "," + d.parent.x;
+    return "M" + getX(d.x) + "," + getY(d.y)
+         + "C" + getX((d.x + d.parent.x) / 2) + "," + getY(d.y)
+         + " " + getX((d.x + d.parent.x) / 2) + "," + getY(d.parent.y)
+         + " " + getX(d.parent.x) + "," + getY(d.parent.y);
 }
 
 function diagonalInit(d) {
     var p = getPreviousPos(d.parent);
 
-    return "M" + p.y + "," + p.x
-        + "C" + p.y + "," + p.x
-        + " " + p.y + "," + p.x
-        + " " + p.y + "," + p.x;
+    return "M" + getX(p.x) + "," + getY(p.y)
+         + "C" + getX(p.x) + "," + getY(p.y)
+         + " " + getX(p.x) + "," + getY(p.y)
+         + " " + getX(p.x) + "," + getY(p.y);
 }
 
 function translate(d) {
-    return "translate(" + d.y + "," + d.x + ")";
+    return "translate(" + getX(d.x) + "," + getY(d.y) + ")";
 }
 
 function translateInit(d) {
     if (d.parent !== null) {
         var p = getPreviousPos(d.parent);
-        return "translate(" + p.y + "," + p.x + ")";
+        return "translate(" + getX(p.x) + "," + getY(p.y) + ")";
     } else {
         return translate(d);
     }
@@ -50,7 +67,7 @@ function fill(d) {
 }
 
 function radius(d) {
-    return (d.data.id === json.current) ? 10 : 8;
+    return (d.data.id === json.current) ? "10" : "8";
 }
 
 function getPreviousPos(d) {
@@ -90,7 +107,27 @@ function update(data) {
 
     // Create tree hierarchy
     var nodes = d3.hierarchy(json.tree);
-    var root = tree(nodes);
+    root = tree(nodes);
+
+    // Swap x / y and make gap between levels constant
+    // Set width for svg element accordingly
+    root.descendants().forEach(function (d) {
+        d.y = d.x;
+        d.x = d.depth * gapLevel;
+        rootSvg.style.width = getWidth(d.x) + "px";
+    });
+
+    // Draw tree
+    redraw();
+
+    // Save the data so we can find the previous position of the parent of a new node
+    rootCurr = root;
+}
+
+function redraw() {
+    if (root === null) {
+        return;
+    }
 
     // Update, add and remove links
     var link = linkLayer.selectAll(".link")
@@ -148,9 +185,6 @@ function update(data) {
             .duration(1000)
                 .attr("r", radius)
                 .attr("fill", fill);
-
-    // Save the data so we can find the previous position of the parent of a new node
-    rootCurr = root;
 }
 
 function click(d) {
