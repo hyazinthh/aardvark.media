@@ -202,7 +202,7 @@ module Provenance =
                                 |> Tree.root
                                 |> Tree.find (fun n -> n.id = id) }
 
-    let set tree prov =
+    let goto' tree prov =
         { prov with tree = tree }
     
     let update prov succ act =

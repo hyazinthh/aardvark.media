@@ -46,8 +46,8 @@ let update (model : Model) (act : Action) =
         | NodeClick id ->
             model |> restore (Provenance.goto id model.provenance)
 
-        | SlideClick t when t.IsSome ->
-            model |> restore (Provenance.set t.Value model.provenance)
+        | SlideClick (FrameSlide (t, _)) ->
+            model |> restore (Provenance.goto' t model.provenance)
 
         | _ -> 
             model
@@ -92,14 +92,7 @@ let view (model : MModel) =
             (AttributeMap.ofList [ clazz "storyboard"; style "height:15%" ]) (
                 alist {
                     for s in model.story.slides do
-                        let click = 
-                            onClick (fun _ ->
-                                SlideClick ( match s with
-                                                | FrameSlide (t, _) -> Some t
-                                                | _ -> None )
-                            )
-
-                        yield div ([ clazz "frame"; click ]) [ 
+                        yield div ([ clazz "frame"; onClick (fun _ -> SlideClick s) ]) [ 
                             img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ] 
                         ]
                 }

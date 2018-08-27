@@ -16,3 +16,6 @@ bin/Debug
 /.paket/Paket.Restore.targets
 /src/Aardvark.Service.Demo/*.TMP
 /src/Scratch/03 - LinePicking/.domaincache
+**/.domaincache
+**/Aardvark.log
+**/.vscode

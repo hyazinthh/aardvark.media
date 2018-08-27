@@ -10,7 +10,7 @@ open Story
 type Action =
     | BoxSelectionAction of BoxSelectionAction
     | NodeClick          of NodeId
-    | SlideClick         of tree<Node> option
+    | SlideClick         of Slide
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
 
