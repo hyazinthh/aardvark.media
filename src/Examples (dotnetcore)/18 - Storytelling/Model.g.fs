@@ -14,10 +14,12 @@ module Mutable =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Model.Model> = Aardvark.Base.Incremental.EqModRef<Model.Model>(__initial) :> Aardvark.Base.Incremental.IModRef<Model.Model>
         let _appModel = BoxSelection.Mutable.MBoxSelectionModel.Create(__initial.appModel)
+        let _dockConfig = ResetMod.Create(__initial.dockConfig)
         let _provenance = Provenance.Mutable.MProvenance.Create(__initial.provenance)
         let _story = Story.Mutable.MStory.Create(__initial.story)
         
         member x.appModel = _appModel
+        member x.dockConfig = _dockConfig :> IMod<_>
         member x.provenance = _provenance
         member x.story = _story
         
@@ -27,6 +29,7 @@ module Mutable =
                 __current.Value <- v
                 
                 BoxSelection.Mutable.MBoxSelectionModel.Update(_appModel, v.appModel)
+                ResetMod.Update(_dockConfig,v.dockConfig)
                 Provenance.Mutable.MProvenance.Update(_provenance, v.provenance)
                 Story.Mutable.MStory.Update(_story, v.story)
                 
@@ -50,6 +53,12 @@ module Mutable =
                     override x.Get(r) = r.appModel
                     override x.Set(r,v) = { r with appModel = v }
                     override x.Update(r,f) = { r with appModel = f r.appModel }
+                }
+            let dockConfig =
+                { new Lens<Model.Model, Aardvark.UI.Primitives.DockConfig>() with
+                    override x.Get(r) = r.dockConfig
+                    override x.Set(r,v) = { r with dockConfig = v }
+                    override x.Update(r,f) = { r with dockConfig = f r.dockConfig }
                 }
             let provenance =
                 { new Lens<Model.Model, Provenance.Provenance>() with

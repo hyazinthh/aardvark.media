@@ -144,16 +144,10 @@ let mkISg (model : MBoxSelectionModel) (box : MVisibleBox) =
             |> Sg.withEvents events
     } |> Sg.dynamic
 
-let view (model : MBoxSelectionModel) =
-                           
+let renderView (model : MBoxSelectionModel) =
+
     let frustum =
         Mod.constant (Frustum.perspective 60.0 0.1 100.0 1.0)
-
-    let semui = 
-        [ 
-            { kind = Stylesheet; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.css" } 
-            { kind = Script; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.js" } 
-        ]
 
     let controllers =
         alist {
@@ -186,76 +180,82 @@ let view (model : MBoxSelectionModel) =
                 ]
             |> Sg.fillMode model.rendering.fillMode
             |> Sg.cullMode model.rendering.cullMode
-            |> Sg.andAlso controllers
-      
+            |> Sg.andAlso controllers        
+
+    FreeFlyController.controlledControl model.camera CameraMessage frustum
+        (AttributeMap.ofList [
+            style "width:100%; height: 100%"
+        ]) scene
+
+let controlsView (model : MBoxSelectionModel) =
+
+    let semui = 
+        [ 
+            { kind = Stylesheet; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.css" } 
+            { kind = Script; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.js" } 
+        ]
+
     require (semui) (
-        div [clazz "ui"; style "background: #1B1C1E"] [
-            FreeFlyController.controlledControl model.camera CameraMessage frustum
-                (AttributeMap.ofList [
-                    style "width:65%; height: 100%; float: left;"
-                ]) scene
+        div [clazz "ui"; style "overflow:auto; background: #1B1C1E"] [
+            Html.SemUi.accordion "Rendering" "configure" true [
+                RenderingParameters.view model.rendering |> UI.map RenderingAction 
+            ]  
 
-            div [style "width:35%; height: 100%; float:right; overflow:auto; background: #1B1C1E"] [
-                Html.SemUi.accordion "Rendering" "configure" true [
-                    RenderingParameters.view model.rendering |> UI.map RenderingAction 
-                ]  
+            Incremental.div AttributeMap.Empty (
+                alist {
+                    let! empty = model.selectedBoxes
+                                    |> ASet.toMod
+                                    |> Mod.map HRefSet.isEmpty
 
-                Incremental.div AttributeMap.Empty (
-                    alist {
-                        let! empty = model.selectedBoxes
-                                        |> ASet.toMod
-                                        |> Mod.map HRefSet.isEmpty
+                    if not empty then
+                        yield Html.SemUi.accordion "Transform" "cogs" true [
+                            Html.table [           
+                                Html.row "Type:" [Html.SemUi.dropDown model.trafoKind SetTrafoKind]      
+                                Html.row "Mode:" [Html.SemUi.dropDown model.trafoMode SetTrafoMode]
+                            ]
+                        ]  
+                }
+            )
 
-                        if not empty then
-                            yield Html.SemUi.accordion "Transform" "cogs" true [
-                                Html.table [           
-                                    Html.row "Type:" [Html.SemUi.dropDown model.trafoKind SetTrafoKind]      
-                                    Html.row "Mode:" [Html.SemUi.dropDown model.trafoMode SetTrafoMode]
-                                ]
-                            ]  
-                    }
+            Html.SemUi.accordion "Boxes" "cubes" true [
+                Incremental.div
+                    (AttributeMap.ofList [clazz "ui buttons"]) (
+                        alist {
+                            let! empty = model.selectedBoxes 
+                                            |> ASet.toMod
+                                            |> Mod.map HRefSet.isEmpty
+
+                            yield button [clazz "ui button"; onMouseClick (fun _ -> AddBox)] [text "Add"]
+
+                            if not empty then
+                                yield button [clazz "ui button"; onMouseClick (fun _ -> RemoveBox)] [text "Remove"]
+                                yield button [clazz "ui button"; onMouseClick (fun _ -> ClearSelection)] [text "Clear"]
+                        }
                 )
 
-                Html.SemUi.accordion "Boxes" "cubes" true [
-                    Incremental.div
-                        (AttributeMap.ofList [clazz "ui buttons"]) (
-                            alist {
-                                let! empty = model.selectedBoxes 
-                                                |> ASet.toMod
-                                                |> Mod.map HRefSet.isEmpty
+                Incremental.div 
+                    (AttributeMap.ofList [clazz "ui divided list"]) (
+                        alist {                                
+                            for (_, b) in (model.boxes |> AMap.toASet |> ASet.toAList) do
+                                let! c = mkColor model b
 
-                                yield button [clazz "ui button"; onMouseClick (fun _ -> AddBox)] [text "Add"]
-
-                                if not empty then
-                                    yield button [clazz "ui button"; onMouseClick (fun _ -> RemoveBox)] [text "Remove"]
-                                    yield button [clazz "ui button"; onMouseClick (fun _ -> ClearSelection)] [text "Clear"]
-                            }
-                    )
-
-                    Incremental.div 
-                        (AttributeMap.ofList [clazz "ui divided list"]) (
-                            alist {                                
-                                for (_, b) in (model.boxes |> AMap.toASet |> ASet.toAList) do
-                                    let! c = mkColor model b
-
-                                    let bgc = sprintf "background: %s" (Html.ofC4b c)
-                                    
-                                    yield 
-                                        div [
-                                            clazz "item"; style bgc; 
-                                            onClick(fun _ -> Select b.id)
-                                            onMouseEnter(fun _ -> Enter b.id)
-                                            onMouseLeave(fun _ -> Exit)
-                                         ] [
-                                            i [clazz "file outline middle aligned icon"][]
-                                         ]                                                                    
-                            }     
-                    )
-                ]
+                                let bgc = sprintf "background: %s" (Html.ofC4b c)
+                                
+                                yield 
+                                    div [
+                                        clazz "item"; style bgc; 
+                                        onClick(fun _ -> Select b.id)
+                                        onMouseEnter(fun _ -> Enter b.id)
+                                        onMouseLeave(fun _ -> Exit)
+                                     ] [
+                                        i [clazz "file outline middle aligned icon"][]
+                                     ]                                                                    
+                        }     
+                )
             ]
         ]
-    )
-             
+    )        
+          
 let initial =
     {
         camera           = FreeFlyController.initial            
@@ -287,6 +287,6 @@ let app : App<BoxSelectionModel,MBoxSelectionModel,BoxSelectionAction> =
         threads = fun model -> FreeFlyController.threads model.camera |> ThreadPool.map CameraMessage
         initial = initial
         update = update
-        view = view
+        view = fun _ -> body [] []
     }
 
