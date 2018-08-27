@@ -12,7 +12,7 @@ type BoxId = BoxId of string
 type ColorIndex = ColorIndex of int
 
 type BoxSelectionAction =
-    | CameraMessage    of CameraControllerMessage     
+    | CameraMessage    of FreeFlyController.Message   
     | RenderingAction  of Action
     | SetTrafoKind     of TrafoKind
     | SetTrafoMode     of TrafoMode

@@ -61,7 +61,7 @@ let update (model : BoxSelectionModel) (act : BoxSelectionAction) =
         
     match act with
         | CameraMessage m when not (isGrabbed model) -> 
-            { model with camera = CameraController.update model.camera m }
+            { model with camera = FreeFlyController.update model.camera m }
         | RenderingAction a ->
             { model with rendering = RenderingParameters.update model.rendering a }
         | Scale (id, a) ->
@@ -190,7 +190,7 @@ let view (model : MBoxSelectionModel) =
       
     require (semui) (
         div [clazz "ui"; style "background: #1B1C1E"] [
-            CameraController.controlledControl model.camera CameraMessage frustum
+            FreeFlyController.controlledControl model.camera CameraMessage frustum
                 (AttributeMap.ofList [
                     style "width:65%; height: 100%; float: left;"
                 ]) scene
@@ -258,7 +258,7 @@ let view (model : MBoxSelectionModel) =
              
 let initial =
     {
-        camera           = CameraController.initial            
+        camera           = FreeFlyController.initial            
         rendering        = RenderingParametersModel.RenderingParameters.initial            
         boxHovered       = None
         boxes            = defaultBox
@@ -284,7 +284,7 @@ let initial =
 let app : App<BoxSelectionModel,MBoxSelectionModel,BoxSelectionAction> =
     {
         unpersist = Unpersist.instance
-        threads = fun model -> CameraController.threads model.camera |> ThreadPool.map CameraMessage
+        threads = fun model -> FreeFlyController.threads model.camera |> ThreadPool.map CameraMessage
         initial = initial
         update = update
         view = view
