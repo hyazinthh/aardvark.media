@@ -19,3 +19,4 @@ bin/Debug
 **/.domaincache
 **/Aardvark.log
 **/.vscode
+/src/Scratch/03 - LinePicking/Model.g.fs
