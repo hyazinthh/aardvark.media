@@ -21,13 +21,13 @@ type private Location<'a> = L of Node<'a> * Path<'a>
 
 // The tree class which is just a wrapper for the
 // private zipper
-type tree<'a> private (location : Location<'a>) =
+type ZTree<'a> private (location : Location<'a>) =
 
     let (L(t, p)) = location
 
     static member Single value =
         let n = { value = value; children = [] }
-        tree (L (n, Top value))
+        ZTree (L (n, Top value))
 
     member x.Value = t.value
 
@@ -41,33 +41,32 @@ type tree<'a> private (location : Location<'a>) =
             | Top _ | Node (_, [], _, _) -> 
                 None
             | Node (_, l::left, up, right) -> 
-                Some (tree (L (l, Node (l.value, left, up, t::right))))
+                Some (ZTree (L (l, Node (l.value, left, up, t::right))))
 
     member x.Right =
         match p with
             | Top _ | Node (_, _, _, []) -> 
                 None
             | Node (_, left, up, r::right) -> 
-                Some (tree (L (r, Node (r.value, t::left, up, right))))
+                Some (ZTree (L (r, Node (r.value, t::left, up, right))))
 
     member x.Parent =
         match p with
             | Top _ -> 
                 None
             | Node (_, left, up, right) ->
-                Some (tree (L ({ value = up.getValue
-                                 children = List.rev left @ t::right }, 
-                               up)
+                Some (ZTree (L ({ value = up.getValue
+                                  children = List.rev left @ t::right }, up)
                             )
                      )
 
     member x.Child =
         match t.children with
             | [] -> None
-            | x::xs -> Some (tree (L(x, Node(x.value, [], p, xs))))
+            | x::xs -> Some (ZTree (L(x, Node(x.value, [], p, xs))))
 
     member x.Children =
-        let rec sib accum (t : tree<'a>) =
+        let rec sib accum (t : ZTree<'a>) =
             match t.Right with
                 | None -> t::accum
                 | Some r -> sib (t::accum) r
@@ -91,14 +90,14 @@ type tree<'a> private (location : Location<'a>) =
     member x.Find predicate =
         match x.TryFind predicate with
             | Some t -> t
-            | None -> failwith "Not found."
+            | None -> failwith "Not found"
 
     member x.FilterChildren predicate =
         let rec filter accum left = function
             | [] -> accum
             | x::xs ->
                 let n = [ if (predicate x.value) then 
-                            yield tree (L (x, Node (x.value, left, p, xs))) ]
+                            yield ZTree (L (x, Node (x.value, left, p, xs))) ]
                     
                 filter (n @ accum) (x::left) xs            
 
@@ -117,16 +116,16 @@ type tree<'a> private (location : Location<'a>) =
 
     member x.Insert value =
         let n = { value = value; children = [] }
-        tree (L (n, Node (value, [], p, t.children)))
+        ZTree (L (n, Node (value, [], p, t.children)))
 
     member x.Update value =
         let n = { t with value = value }
 
         match p with
             | Top _ -> 
-                tree (L (n, Top value))
+                ZTree (L (n, Top value))
             | Node (_, left, up, right) ->
-                tree (L (n, Node (value, left, up, right)));
+                ZTree (L (n, Node (value, left, up, right)));
 
     member x.Count =
         let rec cnt t =
@@ -163,46 +162,47 @@ type tree<'a> private (location : Location<'a>) =
             
         printNode t
             
+and 'a ztree = ZTree<'a>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Tree =
+module ZTree =
 
-    let single value = tree<_>.Single value
+    let single value = ZTree<_>.Single value
 
-    let value (tree : tree<'a>) = tree.Value
+    let value (tree : ZTree<'a>) = tree.Value
 
-    let isRoot (tree : tree<'a>) = tree.IsRoot
+    let isRoot (tree : ZTree<'a>) = tree.IsRoot
 
-    let left (tree : tree<'a>) = tree.Left
+    let left (tree : ZTree<'a>) = tree.Left
 
-    let right (tree : tree<'a>) = tree.Right
+    let right (tree : ZTree<'a>) = tree.Right
 
-    let parent (tree : tree<'a>) = tree.Parent
+    let parent (tree : ZTree<'a>) = tree.Parent
 
-    let child (tree : tree<'a>) = tree.Child
+    let child (tree : ZTree<'a>) = tree.Child
 
-    let children (tree : tree<'a>) = tree.Children
+    let children (tree : ZTree<'a>) = tree.Children
 
-    let filter (predicate : 'a -> bool) (tree : tree<'a>) = tree.Filter predicate
+    let filter (predicate : 'a -> bool) (tree : ZTree<'a>) = tree.Filter predicate
 
-    let tryFind (predicate : 'a -> bool) (tree : tree<'a>) = tree.TryFind predicate
+    let tryFind (predicate : 'a -> bool) (tree : ZTree<'a>) = tree.TryFind predicate
 
-    let find (predicate : 'a -> bool) (tree : tree<'a>) = tree.Find predicate
+    let find (predicate : 'a -> bool) (tree : ZTree<'a>) = tree.Find predicate
    
-    let filterChildren (predicate : 'a -> bool) (tree : tree<'a>) = tree.FilterChildren predicate
+    let filterChildren (predicate : 'a -> bool) (tree : ZTree<'a>) = tree.FilterChildren predicate
 
-    let hasChildren (tree : tree<'a>) = tree.HasChildren
+    let hasChildren (tree : ZTree<'a>) = tree.HasChildren
 
-    let isLeaf (tree : tree<'a>) = tree.IsLeaf
+    let isLeaf (tree : ZTree<'a>) = tree.IsLeaf
 
-    let root (tree : tree<'a>) = tree.Root
+    let root (tree : ZTree<'a>) = tree.Root
 
-    let insert (value : 'a) (tree : tree<'a>) = tree.Insert value
+    let insert (value : 'a) (tree : ZTree<'a>) = tree.Insert value
 
-    let update (value : 'a) (tree : tree<'a>) = tree.Update value
+    let update (value : 'a) (tree : ZTree<'a>) = tree.Update value
 
-    let count (tree : tree<'a>) = tree.Count
+    let count (tree : ZTree<'a>) = tree.Count
 
-    let branchingFactor (tree : tree<'a>) = tree.BranchingFactor
+    let branchingFactor (tree : ZTree<'a>) = tree.BranchingFactor
 
-    let toJson (f : 'a -> (string * string) list) (tree : tree<'a>) = tree.ToJson f
+    let toJson (f : 'a -> (string * string) list) (tree : ZTree<'a>) = tree.ToJson f

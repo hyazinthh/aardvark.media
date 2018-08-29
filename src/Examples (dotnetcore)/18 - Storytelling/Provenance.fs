@@ -33,7 +33,7 @@ type Node = {
 
 [<DomainType>]
 type Provenance = {
-    tree : tree<Node>
+    tree : ZTree<Node>
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -112,7 +112,7 @@ module Node =
 module Provenance =
 
     let private checkMessage msg input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
                 if msg = Unknown then
                     Decided tree
                 else
@@ -120,7 +120,7 @@ module Provenance =
         )
 
     let private checkStateChanged state input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
                 if State.equal tree.Value.state state then
                     Decided tree
                 else
@@ -128,7 +128,7 @@ module Provenance =
         )
 
     let private checkParent state input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
             match tree.Parent with
                 | Some p when (State.equal p.Value.state state) ->
                     Decided p
@@ -137,9 +137,9 @@ module Provenance =
         ) 
 
     let private checkChildren state msg input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
             let c =
-                tree |> Tree.filterChildren (fun n ->
+                tree |> ZTree.filterChildren (fun n ->
                     (State.equal n.state state) && (n.message = Some msg)
                 )
             
@@ -152,26 +152,26 @@ module Provenance =
         ) 
 
     let private coalesceWithCurrent state msg input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
             let coal = 
-                tree |> Tree.value
+                tree |> ZTree.value
                      |> Node.message
                      |> Option.map ((=) msg)
                      |> Option.defaultValue false
-                     |> (&&) (Tree.isLeaf tree)                
+                     |> (&&) (ZTree.isLeaf tree)                
 
             match coal with
                 | true ->
                     let v = { tree.Value with state = state }
-                    Decided (Tree.update v tree)
+                    Decided (ZTree.update v tree)
                 | false ->
                     Undecided tree
         )
 
     let private coalesceWithChild state msg input =
-        input |> Decision.map (fun (tree : tree<Node>) ->
+        input |> Decision.map (fun (tree : ZTree<Node>) ->
             let c =
-                tree |> Tree.filterChildren (fun n -> n.message = Some msg) 
+                tree |> ZTree.filterChildren (fun n -> n.message = Some msg) 
                      |> List.filter (fun t -> t.IsLeaf)
 
             if List.length c > 1 then
@@ -182,28 +182,25 @@ module Provenance =
                     Undecided tree
                 | t::_ ->
                     let v = { t.Value with state = state }
-                    Decided (Tree.update v t)
+                    Decided (ZTree.update v t)
         )
 
     let private appendNew state msg input =
         input |> Decision.map (fun tree ->
-            tree |> Tree.insert (Node.create state (Some msg)) |> Decided
+            tree |> ZTree.insert (Node.create state (Some msg)) |> Decided
         )
 
     let undo prov =
         prov.tree
-            |> Tree.parent
+            |> ZTree.parent
             |> Option.map (fun t ->
                 { prov with tree = t }
             )
 
     let goto id prov =
         { prov with tree = prov.tree 
-                                |> Tree.root
-                                |> Tree.find (fun n -> n.id = id) }
-
-    let goto' tree prov =
-        { prov with tree = tree }
+                                |> ZTree.root
+                                |> ZTree.find (fun n -> n.id = id) }
     
     let update prov succ act =
 
@@ -228,4 +225,4 @@ module Provenance =
 
     let init model =
         { tree = Node.create (State.create model) None
-                    |> Tree.single }
+                    |> ZTree.single }

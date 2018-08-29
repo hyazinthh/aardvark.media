@@ -22,4 +22,5 @@ type Model = {
     dockConfig : DockConfig
     provenance : Provenance
     story : Story
+    presentation : bool
 }

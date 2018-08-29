@@ -65,22 +65,68 @@ module Mutable =
                 }
     
     
+    type MSlide(__initial : Story.Slide) =
+        inherit obj()
+        let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Slide> = Aardvark.Base.Incremental.EqModRef<Story.Slide>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Slide>
+        let _id = ResetMod.Create(__initial.id)
+        let _content = ResetMod.Create(__initial.content)
+        
+        member x.id = _id :> IMod<_>
+        member x.content = _content :> IMod<_>
+        
+        member x.Current = __current :> IMod<_>
+        member x.Update(v : Story.Slide) =
+            if not (System.Object.ReferenceEquals(__current.Value, v)) then
+                __current.Value <- v
+                
+                ResetMod.Update(_id,v.id)
+                ResetMod.Update(_content,v.content)
+                
+        
+        static member Create(__initial : Story.Slide) : MSlide = MSlide(__initial)
+        static member Update(m : MSlide, v : Story.Slide) = m.Update(v)
+        
+        override x.ToString() = __current.Value.ToString()
+        member x.AsString = sprintf "%A" __current.Value
+        interface IUpdatable<Story.Slide> with
+            member x.Update v = x.Update v
+    
+    
+    
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module Slide =
+        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+        module Lens =
+            let id =
+                { new Lens<Story.Slide, Story.SlideId>() with
+                    override x.Get(r) = r.id
+                    override x.Set(r,v) = { r with id = v }
+                    override x.Update(r,f) = { r with id = f r.id }
+                }
+            let content =
+                { new Lens<Story.Slide, Story.Content>() with
+                    override x.Get(r) = r.content
+                    override x.Set(r,v) = { r with content = v }
+                    override x.Update(r,f) = { r with content = f r.content }
+                }
+    
+    
     type MStory(__initial : Story.Story) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Story> = Aardvark.Base.Incremental.EqModRef<Story.Story>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Story>
-        let _slides = MList.Create(__initial.slides)
-        let _current = ResetMod.Create(__initial.current)
+        let _slides = ResetMod.Create(__initial.slides)
+        let _selected = MOption.Create(__initial.selected, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         
-        member x.slides = _slides :> alist<_>
-        member x.current = _current :> IMod<_>
+        member x.slides = _slides :> IMod<_>
+        member x.selected = _selected :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Story.Story) =
             if not (System.Object.ReferenceEquals(__current.Value, v)) then
                 __current.Value <- v
                 
-                MList.Update(_slides, v.slides)
-                ResetMod.Update(_current,v.current)
+                ResetMod.Update(_slides,v.slides)
+                MOption.Update(_selected, v.selected)
                 
         
         static member Create(__initial : Story.Story) : MStory = MStory(__initial)
@@ -98,14 +144,14 @@ module Mutable =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
             let slides =
-                { new Lens<Story.Story, Aardvark.Base.plist<Story.Slide>>() with
+                { new Lens<Story.Story, Story.ZList<Story.Slide>>() with
                     override x.Get(r) = r.slides
                     override x.Set(r,v) = { r with slides = v }
                     override x.Update(r,f) = { r with slides = f r.slides }
                 }
-            let current =
-                { new Lens<Story.Story, Aardvark.Base.Index>() with
-                    override x.Get(r) = r.current
-                    override x.Set(r,v) = { r with current = v }
-                    override x.Update(r,f) = { r with current = f r.current }
+            let selected =
+                { new Lens<Story.Story, Microsoft.FSharp.Core.Option<Story.Slide>>() with
+                    override x.Get(r) = r.selected
+                    override x.Set(r,v) = { r with selected = v }
+                    override x.Update(r,f) = { r with selected = f r.selected }
                 }

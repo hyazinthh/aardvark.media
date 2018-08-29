@@ -17,11 +17,13 @@ module Mutable =
         let _dockConfig = ResetMod.Create(__initial.dockConfig)
         let _provenance = Provenance.Mutable.MProvenance.Create(__initial.provenance)
         let _story = Story.Mutable.MStory.Create(__initial.story)
+        let _presentation = ResetMod.Create(__initial.presentation)
         
         member x.appModel = _appModel
         member x.dockConfig = _dockConfig :> IMod<_>
         member x.provenance = _provenance
         member x.story = _story
+        member x.presentation = _presentation :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Model.Model) =
@@ -32,6 +34,7 @@ module Mutable =
                 ResetMod.Update(_dockConfig,v.dockConfig)
                 Provenance.Mutable.MProvenance.Update(_provenance, v.provenance)
                 Story.Mutable.MStory.Update(_story, v.story)
+                ResetMod.Update(_presentation,v.presentation)
                 
         
         static member Create(__initial : Model.Model) : MModel = MModel(__initial)
@@ -71,4 +74,10 @@ module Mutable =
                     override x.Get(r) = r.story
                     override x.Set(r,v) = { r with story = v }
                     override x.Update(r,f) = { r with story = f r.story }
+                }
+            let presentation =
+                { new Lens<Model.Model, System.Boolean>() with
+                    override x.Get(r) = r.presentation
+                    override x.Set(r,v) = { r with presentation = v }
+                    override x.Update(r,f) = { r with presentation = f r.presentation }
                 }

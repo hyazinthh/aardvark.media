@@ -1,4 +1,10 @@
-﻿.rootSvg {
+﻿body {
+    overflow-x: auto; 
+    overflow-y: hidden; 
+    background-color: #1B1C1E;
+}
+
+.rootSvg {
     user-select: none;
 }
 

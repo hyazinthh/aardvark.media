@@ -150,7 +150,7 @@ module Mutable =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
             let tree =
-                { new Lens<Provenance.Provenance, Provenance.tree<Provenance.Node>>() with
+                { new Lens<Provenance.Provenance, Provenance.ZTree<Provenance.Node>>() with
                     override x.Get(r) = r.tree
                     override x.Set(r,v) = { r with tree = v }
                     override x.Update(r,f) = { r with tree = f r.tree }
