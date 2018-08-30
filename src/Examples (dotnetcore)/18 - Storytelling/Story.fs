@@ -15,7 +15,7 @@ type Text = {
 
 type Content =
     | TextContent of List<Text>
-    | FrameContent of Node * List<Text>
+    | FrameContent of Node * CameraView * List<Text>
 
 type SlideId = SlideId of string
 
@@ -36,9 +36,9 @@ module Slide =
     
     let private newId () = SlideId (Guid.NewGuid().ToString()) 
 
-    let frame node text = {
+    let frame node view text = {
         id = newId ()
-        content = FrameContent (node, text)
+        content = FrameContent (node, view, text)
     }  
     
     let id slide =
@@ -59,6 +59,9 @@ module Story =
         match trySelected s with
             | None -> failwith "No slide selected"
             | Some s -> s
+
+    let select (sel : Slide option) (s : Story) =
+        { s with selected = sel }
 
     let forward (s : Story) =
         let r = s.selected |> Option.bind (fun x ->

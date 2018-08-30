@@ -1,10 +1,10 @@
-﻿namespace Story
+﻿namespace Aardvark.Base
 
-type private Location<'a> =
+type private ZListLocation<'a> =
     | Empty
     | L of 'a list * 'a * 'a list
 
-type ZList<'a> private (location : Location<'a>) =
+type ZList<'a> private (location : ZListLocation<'a>) =
 
     static member Empty = 
         ZList<'a> Empty

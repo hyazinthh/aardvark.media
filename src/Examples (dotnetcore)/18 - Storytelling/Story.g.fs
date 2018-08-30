@@ -144,7 +144,7 @@ module Mutable =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
             let slides =
-                { new Lens<Story.Story, Story.ZList<Story.Slide>>() with
+                { new Lens<Story.Story, Aardvark.Base.ZList<Story.Slide>>() with
                     override x.Get(r) = r.slides
                     override x.Set(r,v) = { r with slides = v }
                     override x.Update(r,f) = { r with slides = f r.slides }

@@ -13,11 +13,9 @@ module Mutable =
     type MState(__initial : Provenance.State) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Provenance.State> = Aardvark.Base.Incremental.EqModRef<Provenance.State>(__initial) :> Aardvark.Base.Incremental.IModRef<Provenance.State>
-        let _view = ResetMod.Create(__initial.view)
         let _boxes = MMap.Create(__initial.boxes, (fun v -> BoxSelection.Mutable.MVisibleBox.Create(v)), (fun (m,v) -> BoxSelection.Mutable.MVisibleBox.Update(m, v)), (fun v -> v))
         let _nextColor = ResetMod.Create(__initial.nextColor)
         
-        member x.view = _view :> IMod<_>
         member x.boxes = _boxes :> amap<_,_>
         member x.nextColor = _nextColor :> IMod<_>
         
@@ -26,7 +24,6 @@ module Mutable =
             if not (System.Object.ReferenceEquals(__current.Value, v)) then
                 __current.Value <- v
                 
-                ResetMod.Update(_view,v.view)
                 MMap.Update(_boxes, v.boxes)
                 ResetMod.Update(_nextColor,v.nextColor)
                 
@@ -45,12 +42,6 @@ module Mutable =
     module State =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
-            let view =
-                { new Lens<Provenance.State, Aardvark.Base.CameraView>() with
-                    override x.Get(r) = r.view
-                    override x.Set(r,v) = { r with view = v }
-                    override x.Update(r,f) = { r with view = f r.view }
-                }
             let boxes =
                 { new Lens<Provenance.State, Aardvark.Base.hmap<BoxSelection.BoxId,BoxSelection.VisibleBox>>() with
                     override x.Get(r) = r.boxes
@@ -150,7 +141,7 @@ module Mutable =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
             let tree =
-                { new Lens<Provenance.Provenance, Provenance.ZTree<Provenance.Node>>() with
+                { new Lens<Provenance.Provenance, Aardvark.Base.ZTree<Provenance.Node>>() with
                     override x.Get(r) = r.tree
                     override x.Set(r,v) = { r with tree = v }
                     override x.Update(r,f) = { r with tree = f r.tree }

@@ -22,12 +22,13 @@
     <EmbeddedResource Include="Provenance.css" />
     <EmbeddedResource Include="Provenance.js" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Decision.fs" />
-    <Compile Include="ZTree.fs" />
     <Compile Include="BoxSelectionModel.fs" />
     <Compile Include="BoxSelectionApp.fs" />
-    <Compile Include="Provenance.fs" />
+    <Compile Include="AppModel.fs" />
+    <Compile Include="Decision.fs" />
+    <Compile Include="ZTree.fs" />
     <Compile Include="ZList.fs" />
+    <Compile Include="Provenance.fs" />
     <Compile Include="Story.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="App.fs" />

@@ -3,8 +3,8 @@
 open System
 open Aardvark.Base
 open Aardvark.Base.Incremental
-open Aardvark.UI.Primitives
 
+open Model
 open BoxSelection
 
 type Message =
@@ -17,7 +17,6 @@ type Message =
 
 [<DomainType>]
 type State = {
-    view : CameraView  
     boxes : hmap<BoxId,VisibleBox>
     nextColor : ColorIndex
 }
@@ -40,11 +39,11 @@ type Provenance = {
 module Message =
     
     let create = function
-        | BoxSelectionAction.Scale (id, _) -> Scale id
-        | BoxSelectionAction.Rotate (id, _) -> Rotate id
-        | BoxSelectionAction.Translate (id, _) -> Translate id
-        | BoxSelectionAction.AddBox -> AddBox
-        | BoxSelectionAction.RemoveBox -> RemoveBox
+        | AppAction.Scale (id, _) -> Scale id
+        | AppAction.Rotate (id, _) -> Rotate id
+        | AppAction.Translate (id, _) -> Translate id
+        | AppAction.AddBox -> AddBox
+        | AppAction.RemoveBox -> RemoveBox
         | _ -> Unknown
 
     let toString = function
@@ -58,24 +57,20 @@ module Message =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module State =
     
-    let create (s : BoxSelectionModel) =
-        { view = s.camera.view
-          boxes = s.boxes
+    let create (s : AppModel) =
+        { boxes = s.boxes
           nextColor = s.nextColor }
         
-    let restore (current : BoxSelectionModel) (s : State) =
-        { current with camera = { current.camera with view = s.view }
-                       boxes = s.boxes
+    let restore (current : AppModel) (s : State) =
+        { current with boxes = s.boxes
                        nextColor = s.nextColor 
                        selectedBoxes = HSet.empty }
 
-    let view s = s.view
+    let boxes (s : State) = s.boxes
 
-    let boxes s = s.boxes
+    let nextColor (s : State) = s.nextColor
 
-    let nextColor s = s.nextColor
-
-    let equal a b =
+    let equal (a : State) (b : State) =
         let boxEqual (x, a) (y, b) =
             x = y && 
             a.color = b.color &&
@@ -88,18 +83,18 @@ module State =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Node =
 
-    let create s m = 
+    let create (s : State) (m : Message option) = 
         { id = NodeId (Guid.NewGuid().ToString())
           state = s
           message = m }
 
-    let state n = n.state
+    let state (n : Node) = n.state
 
-    let message n = n.message
+    let message (n : Node) = n.message
 
-    let id n = n.id
+    let id (n : Node) = n.id
 
-    let properties n = [ 
+    let properties (n : Node) = [ 
         let (NodeId id) = n.id
         yield "id", id
 
@@ -190,19 +185,19 @@ module Provenance =
             tree |> ZTree.insert (Node.create state (Some msg)) |> Decided
         )
 
-    let undo prov =
+    let undo (prov : Provenance) =
         prov.tree
             |> ZTree.parent
             |> Option.map (fun t ->
                 { prov with tree = t }
             )
 
-    let goto id prov =
+    let goto (id : NodeId) (prov : Provenance) =
         { prov with tree = prov.tree 
                                 |> ZTree.root
                                 |> ZTree.find (fun n -> n.id = id) }
     
-    let update prov succ act =
+    let update (succ : AppModel) (act : AppAction) (prov : Provenance) =
 
         let state = State.create succ
         let msg = Message.create act
@@ -220,9 +215,9 @@ module Provenance =
 
         { prov with tree = t }
 
-    let restore prov model =
+    let restore (prov : Provenance) (model : AppModel) =
         State.restore model prov.tree.Value.state
 
-    let init model =
+    let init (model : AppModel) =
         { tree = Node.create (State.create model) None
                     |> ZTree.single }

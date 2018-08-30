@@ -5,7 +5,6 @@ open Aardvark.Base.Incremental
 open Aardvark.UI
 open Aardvark.UI.Primitives
 open Aardvark.Application
-open LensOperators
 
 open Model
 open Provenance
@@ -48,16 +47,17 @@ let restore prov model =
 
 let restoreSlide model =
     match model.story |> Story.selected |> Slide.content with
-        | FrameContent (t, _) ->
-            model |> restore (Provenance.goto t.id model.provenance)
+        | FrameContent (node, view, _) ->
+            model |> Model.setView view 
+                  |> restore (Provenance.goto node.id model.provenance)
         | _ -> 
             model
 
 let update (model : Model) (act : Action) = 
     match act with
-        | BoxSelectionAction a -> 
+        | AppAction a -> 
             let succ = BoxSelectionApp.update model.appModel a
-            let prov = Provenance.update model.provenance succ a 
+            let prov = model.provenance |> Provenance.update succ a 
 
             { model with appModel = succ
                          provenance = prov }
@@ -68,7 +68,7 @@ let update (model : Model) (act : Action) =
                 | None -> model
 
         | KeyDown Keys.A ->
-            let slide = Slide.frame model.provenance.tree.Value []
+            let slide = Slide.frame model.provenance.tree.Value (Model.getView model) []
             { model with story = model.story |> Story.append slide  }
 
         | KeyDown Keys.R ->
@@ -91,8 +91,7 @@ let update (model : Model) (act : Action) =
                 |> restoreSlide
 
         | NodeClick id ->
-            let selected = Model.Lens.story |. Story.Lens.selected
-            selected.Set (model, None) 
+            { model with story = model.story |> Story.select None }
                 |> restore (Provenance.goto id model.provenance)
 
         | SlideClick slide ->
@@ -108,13 +107,13 @@ let update (model : Model) (act : Action) =
 let renderView (model : MModel) =
     body [ onKeyDown KeyDown; onKeyUp KeyUp ] [
         BoxSelectionApp.renderView model.appModel
-            |> UI.map BoxSelectionAction
+            |> UI.map AppAction
     ]
 
 let controlsView (model : MModel) =
     body [style "background-color:#1B1C1E"] [
         BoxSelectionApp.controlsView model.appModel
-            |> UI.map BoxSelectionAction
+            |> UI.map AppAction
     ]
 
 let provenanceView (model : MModel) =
@@ -212,7 +211,7 @@ let app : App<Model,MModel,Action> =
         unpersist = Unpersist.instance
         threads = fun model -> model.appModel 
                                     |> BoxSelectionApp.app.threads 
-                                    |> ThreadPool.map BoxSelectionAction
+                                    |> ThreadPool.map AppAction
         initial = initial
         update = update
         view = view

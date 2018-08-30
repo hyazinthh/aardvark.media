@@ -1,15 +1,15 @@
-﻿namespace Provenance
+﻿namespace Aardvark.Base
 
 // The inner representation of the tree as nodes
-type private Node<'a> = {
+type private ZTreeNode<'a> = {
     value : 'a
-    children : Node<'a> list
+    children : ZTreeNode<'a> list
 }
 
 // Path type for the zipper
-type private Path<'a> =
+type private ZTreePath<'a> =
     | Top of 'a
-    | Node of 'a * Node<'a> list * Path<'a> * Node<'a> list
+    | Node of 'a * ZTreeNode<'a> list * ZTreePath<'a> * ZTreeNode<'a> list
 
     member x.getValue =
         match x with
@@ -17,11 +17,11 @@ type private Path<'a> =
             | Node (v, _, _, _) -> v
 
 // Zipper
-type private Location<'a> = L of Node<'a> * Path<'a>
+type private ZTreeLocation<'a> = L of ZTreeNode<'a> * ZTreePath<'a>
 
 // The tree class which is just a wrapper for the
 // private zipper
-type ZTree<'a> private (location : Location<'a>) =
+type ZTree<'a> private (location : ZTreeLocation<'a>) =
 
     let (L(t, p)) = location
 
