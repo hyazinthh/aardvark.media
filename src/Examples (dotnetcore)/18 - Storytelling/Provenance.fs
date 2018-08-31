@@ -33,6 +33,7 @@ type Node = {
 [<DomainType>]
 type Provenance = {
     tree : ZTree<Node>
+    hasFrames : Node -> bool
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -146,19 +147,21 @@ module Provenance =
                 | t::_ -> Decided t
         ) 
 
-    let private coalesceWithCurrent state msg input =
+    let private coalesceWithCurrent state msg hasFrames input =
         input |> Decision.map (fun (tree : ZTree<Node>) ->
+            let node = tree.Value
+
             let coal = 
-                tree |> ZTree.value
-                     |> Node.message
+                node |> Node.message
                      |> Option.map ((=) msg)
                      |> Option.defaultValue false
+                     |> (&&) (not (hasFrames node))
                      |> (&&) (ZTree.isLeaf tree)                
 
             match coal with
                 | true ->
-                    let v = { tree.Value with state = state }
-                    Decided (ZTree.update v tree)
+                    let v = { node with state = state }
+                    Decided (tree |> ZTree.set v)
                 | false ->
                     Undecided tree
         )
@@ -177,7 +180,7 @@ module Provenance =
                     Undecided tree
                 | t::_ ->
                     let v = { t.Value with state = state }
-                    Decided (ZTree.update v t)
+                    Decided (t |> ZTree.set v)
         )
 
     let private appendNew state msg input =
@@ -208,7 +211,7 @@ module Provenance =
                 |> checkStateChanged state
                 |> checkParent state
                 |> checkChildren state msg
-                |> coalesceWithCurrent state msg
+                |> coalesceWithCurrent state msg prov.hasFrames
                 |> coalesceWithChild state msg
                 |> appendNew state msg
                 |> Decision.get
@@ -220,4 +223,11 @@ module Provenance =
 
     let init (model : AppModel) =
         { tree = Node.create (State.create model) None
-                    |> ZTree.single }
+                    |> ZTree.single 
+          hasFrames = fun _ -> false }
+
+    let updateNode (f : Node -> Node) (prov : Provenance) =
+        { prov with tree = prov.tree |> ZTree.update f}
+
+    let setHasFrames (f : Node -> bool) (prov : Provenance) =
+        { prov with hasFrames = f }

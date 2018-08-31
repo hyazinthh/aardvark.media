@@ -9,8 +9,13 @@ type ZList<'a> private (location : ZListLocation<'a>) =
     static member Empty = 
         ZList<'a> Empty
 
-    static member Single value =
+    static member Single (value : 'a) =
         ZList (L ([], value, []))
+
+    static member OfList (list : 'a list) =
+        match list with
+            | [] -> ZList Empty
+            | x::xs -> ZList (L ([], x, xs))
 
     member private x.Location = location
 
@@ -59,41 +64,47 @@ type ZList<'a> private (location : ZListLocation<'a>) =
             | None -> x
             | Some r -> r.End
 
-    member x.InsertBefore value =
+    member x.InsertBefore (value : 'a) =
         match location with
             | Empty -> 
                 ZList<_>.Single value
             | L (left, v, right) ->
                 ZList (L (left, value, v::right))
 
-    member x.InsertAfter value =
+    member x.InsertAfter (value : 'a) =
         match location with
             | Empty -> 
                 ZList<_>.Single value
             | L (left, v, right) ->
                 ZList (L (v::left, value, right))
 
-    member x.Append value =
+    member x.Append (value : 'a) =
         x.End.InsertAfter value
 
-    member x.Map f =
+    member x.Map (f : 'a -> 'b) =
         match location with
             | Empty ->
                 ZList Empty
             | L (left, v, right) ->
                 ZList (L (List.map f left, f v, List.map f right))
 
+    member x.Filter (predicate : 'a -> bool) =
+        ZList.OfList (x.ToList |> List.filter predicate)
+
+    member x.Remove (predicate : 'a -> bool) =
+        x.Filter (predicate >> not)
+
     member x.Count =
         match location with
             | Empty -> 0
             | L (left, _, right) -> left.Length + right.Length + 1
 
-     member x.ToList =
+    member x.ToList =
         match location with
             | Empty -> []
             | L (left, v, right) -> (List.rev left) @ (v :: right)
 
-     member x.TryFind predicate =
+     member x.TryFind (predicate : 'a -> bool) =
         let rec fnd (y : 'a zlist) =
             match y.Location with
                 | L (_, v, _) when predicate v -> Some y
@@ -102,9 +113,14 @@ type ZList<'a> private (location : ZListLocation<'a>) =
             
         fnd x.Beginning
 
-     member x.Find predicate =
+     member x.Find (predicate : 'a -> bool) =
         match x.TryFind predicate with
             | None -> failwith "Not found"
+            | Some l -> l
+
+     member x.FindDefault (predicate : 'a -> bool) (def : 'a zlist) =
+        match x.TryFind predicate with
+            | None -> def
             | Some l -> l
         
 and 'a zlist = ZList<'a>       
@@ -114,7 +130,9 @@ module ZList =
 
     let empty<'a> = ZList<'a>.Empty 
 
-    let single value = ZList<_>.Single value
+    let single (value : 'a) = ZList<_>.Single value
+
+    let ofList (list : List<'a>) = ZList<_>.OfList list
 
     let isEmpty (list : ZList<'a>) = list.IsEmpty
 
@@ -142,6 +160,10 @@ module ZList =
 
     let map (f : 'a -> 'b) (list : ZList<'a>) = list.Map f
 
+    let filter (predicate : 'a -> bool) (list : ZList<'a>) = list.Filter predicate
+
+    let remove (predicate : 'a -> bool) (list : ZList<'a>) = list.Remove predicate
+
     let count (list : ZList<'a>) = list.Count
 
     let toList (list : ZList<'a>) = list.ToList
@@ -149,3 +171,5 @@ module ZList =
     let tryFind (predicate : 'a -> bool) (list : ZList<'a>) = list.TryFind predicate
 
     let find (predicate : 'a -> bool) (list : ZList<'a>) = list.Find predicate
+
+    let findDefault (predicate : 'a -> bool) (def : ZList<'a>) (list : ZList<'a>) = list.FindDefault predicate def

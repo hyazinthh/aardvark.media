@@ -47,7 +47,7 @@ let restore prov model =
 
 let restoreSlide model =
     match model.story |> Story.selected |> Slide.content with
-        | FrameContent (node, view, _) ->
+        | FrameContent (node, view) ->
             model |> Model.setView view 
                   |> restore (Provenance.goto node.id model.provenance)
         | _ -> 
@@ -68,8 +68,15 @@ let update (model : Model) (act : Action) =
                 | None -> model
 
         | KeyDown Keys.A ->
-            let slide = Slide.frame model.provenance.tree.Value (Model.getView model) []
-            { model with story = model.story |> Story.append slide  }
+            let slide = Slide.frame model.provenance (Model.getView model)
+            let story = model.story |> Story.append slide
+            { model with story = story
+                         provenance = model.provenance |> Provenance.setHasFrames (Story.hasFrames story) }
+
+        | RemoveSlide slide ->
+            let story = model.story |> Story.remove slide
+            { model with story = story
+                         provenance = model.provenance |> Provenance.setHasFrames (Story.hasFrames story) }
 
         | KeyDown Keys.R ->
             { model with dockConfig = initial.dockConfig }
@@ -156,8 +163,22 @@ let storyboardView (model : MModel) =
             onClick (fun _ -> SlideClick slide)
         ]
 
+        (* TODO: Probably cleaner to do this in a *.js file *)
         div atts [
             img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ]
+
+            onBoot "$('#__ID__').click(function(e){ e.stopPropagation(); })" (
+                Svg.svg [ 
+                    clazz "removeButton"
+                    onClick (fun _ -> RemoveSlide slide)
+                ] [
+                    Svg.rect [
+                        attribute "width" "22px"; attribute "height" "20px";
+                        attribute "rx" "8px"; attribute "ry" "4px";
+                    ]
+                    Svg.path [ attribute "d" "M 5 4 L 17 16 M 5 16 L 17 4" ]
+                ]
+            )
         ]
 
     body [] [

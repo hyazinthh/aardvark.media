@@ -15,7 +15,7 @@ type Text = {
 
 type Content =
     | TextContent of List<Text>
-    | FrameContent of Node * CameraView * List<Text>
+    | FrameContent of Node * CameraView
 
 type SlideId = SlideId of string
 
@@ -36,15 +36,15 @@ module Slide =
     
     let private newId () = SlideId (Guid.NewGuid().ToString()) 
 
-    let frame node view text = {
+    let frame (provenance : Provenance) (view : CameraView) = {
         id = newId ()
-        content = FrameContent (node, view, text)
+        content = FrameContent (provenance.tree.Value, view)
     }  
     
-    let id slide =
+    let id (slide : Slide) =
         slide.id
 
-    let content slide =
+    let content (slide : Slide) =
         slide.content
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -60,22 +60,32 @@ module Story =
             | None -> failwith "No slide selected"
             | Some s -> s
 
+    let hasFrames (s : Story) (node : Node) =
+        s.slides |> ZList.tryFind (fun s -> 
+            match s.content with
+                | TextContent _ -> false
+                | FrameContent (n, _) -> n.id = node.id
+        ) |> Option.isSome
+
+    let find (slide : Slide) (s : Story) =
+        s.slides |> ZList.find (fun s -> s.id = slide.id)
+
     let select (sel : Slide option) (s : Story) =
         { s with selected = sel }
 
     let forward (s : Story) =
         let r = s.selected |> Option.bind (fun x ->
-                    s.slides |> ZList.find (fun s -> s.id = x.id)
-                             |> ZList.right
-                             |> Option.bind ZList.tryHead )
+                    s |> find x
+                      |> ZList.right
+                      |> Option.bind ZList.tryHead )
 
         if r.IsNone then s else { s with selected = r}
 
     let backward (s : Story) =
         let l = s.selected |> Option.bind (fun x ->
-                    s.slides |> ZList.find (fun s -> s.id = x.id)
-                             |> ZList.left
-                             |> Option.bind ZList.tryHead )
+                    s |> find x
+                      |> ZList.left
+                      |> Option.bind ZList.tryHead )
 
         if l.IsNone then s else { s with selected = l}
 
@@ -85,3 +95,7 @@ module Story =
     let append (slide : Slide) (s : Story) =
         { slides = s.slides |> ZList.append slide
           selected = Some slide }
+
+    let remove (slide : Slide) (s : Story) =
+        { slides = s.slides |> ZList.remove (fun s -> s.id = slide.id)
+          selected = s.selected |> Option.bind (fun s -> if s.id = slide.id then None else Some s) }

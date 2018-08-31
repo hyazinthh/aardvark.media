@@ -13,6 +13,7 @@ type Action =
     | UpdateConfig       of DockConfig
     | NodeClick          of NodeId
     | SlideClick         of Slide
+    | RemoveSlide        of Slide
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
 

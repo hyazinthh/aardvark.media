@@ -25,7 +25,7 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
 
     let (L(t, p)) = location
 
-    static member Single value =
+    static member Single (value : 'a) =
         let n = { value = value; children = [] }
         ZTree (L (n, Top value))
 
@@ -75,24 +75,24 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | None -> []
             | Some t -> sib [] t
 
-    member x.Filter predicate = [
+    member x.Filter (predicate : 'a -> bool) = [
             if predicate t.value then yield x
             yield! x.Children 
                         |> List.collect (fun t -> t.Filter predicate)
         ]
 
     // Find methods use filter, may be optimized
-    member x.TryFind predicate =
+    member x.TryFind (predicate : 'a -> bool) =
         match x.Filter predicate with
             | t::_ -> Some t
             | _ -> None
     
-    member x.Find predicate =
+    member x.Find (predicate : 'a -> bool) =
         match x.TryFind predicate with
             | Some t -> t
             | None -> failwith "Not found"
 
-    member x.FilterChildren predicate =
+    member x.FilterChildren (predicate : 'a -> bool) =
         let rec filter accum left = function
             | [] -> accum
             | x::xs ->
@@ -114,11 +114,11 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | None -> x
             | Some p -> p.Root
 
-    member x.Insert value =
+    member x.Insert (value : 'a) =
         let n = { value = value; children = [] }
         ZTree (L (n, Node (value, [], p, t.children)))
 
-    member x.Update value =
+    member x.Set (value : 'a) =
         let n = { t with value = value }
 
         match p with
@@ -126,6 +126,9 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
                 ZTree (L (n, Top value))
             | Node (_, left, up, right) ->
                 ZTree (L (n, Node (value, left, up, right)));
+
+    member x.Update (f : 'a -> 'a) =
+        x.Set (f x.Value)
 
     member x.Count =
         let rec cnt t =
@@ -199,7 +202,9 @@ module ZTree =
 
     let insert (value : 'a) (tree : ZTree<'a>) = tree.Insert value
 
-    let update (value : 'a) (tree : ZTree<'a>) = tree.Update value
+    let set (value : 'a) (tree : ZTree<'a>) = tree.Set value
+
+    let update (f : 'a -> 'a) (tree : ZTree<'a>) = tree.Update f
 
     let count (tree : ZTree<'a>) = tree.Count
 
