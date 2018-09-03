@@ -1,7 +1,7 @@
 ﻿var fst = '.first';
 var snd = '.second';
 var transition = 'horizontal flip';
-var duration = '150ms';
+var duration = '100ms';
 
 function isAnimating(btn) {
 	return btn.find(fst).transition('is animating') ||
@@ -13,7 +13,7 @@ function isVisible(elem) {
 }
 
 function isHovered(elem) {
-    return $("#" + elem.attr('id') + ':hover').length > 0;
+    return $('#' + elem.attr('id') + ':hover').length > 0;
 }
 
 function resetButton(btn) {
@@ -27,8 +27,7 @@ function onButtonHover(btn, from, to, hover) {
 	}
 	
 	btn.find(from).transition(transition, duration, function() {
-		if (!isVisible(btn)) { 
-			resetButton(btn);
+		if (!isVisible(btn)) {
 			return; 
 		}
 
