@@ -2,6 +2,7 @@
 
 open Aardvark.Base
 open Aardvark.Base.Incremental
+open Aardvark.Base.Incremental.Operators
 open Aardvark.UI
 open Aardvark.UI.Primitives
 open Aardvark.Application
@@ -9,6 +10,29 @@ open Aardvark.Application
 open Model
 open Provenance
 open Story
+
+module Html =
+
+    module SemUi =
+
+        let button (icon : string option) (label : string) (enabled : IMod<bool>) (callback : IMod<unit -> 'a>) =
+
+            let attributes = amap {
+                let! enabled = enabled
+                let! cb = callback
+
+                let cl = "ui button " + if enabled then "" else "disabled"
+
+                yield! [clazz cl; onClick cb]
+            }
+
+            Incremental.div (attributes |> AttributeMap.ofAMap) (
+                alist {
+                    if icon.IsSome then 
+                        yield i [clazz ("icon " + icon.Value)] []
+                    yield text label
+                }
+            )
 
 let onNodeClick (cb : NodeId -> 'msg) =
     onEvent "onnodeclick" [] (List.head >> Aardvark.UI.Pickler.unpickleOfJson >> NodeId >> cb)
@@ -24,6 +48,7 @@ let initial =
 
                                     stack 1.0 (Some "controls") [
                                         { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None }
+                                        { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None }
                                     ]
                                 ]
 
@@ -47,9 +72,10 @@ let restore prov model =
 
 let restoreSlide model =
     match model.story |> Story.selected |> Slide.content with
-        | FrameContent (node, view) ->
+        | FrameContent (node, view, rendering) ->
             model |> Model.setView view 
-                  |> restore (Provenance.goto node.id model.provenance)
+                  |> Model.setRendering rendering
+                  |> restore (Provenance.goto node model.provenance)
         | _ -> 
             model
 
@@ -67,14 +93,18 @@ let update (model : Model) (act : Action) =
                 | Some prov -> restore prov model
                 | None -> model
 
-        | KeyDown Keys.A ->
-            let slide = Slide.frame model.provenance (Model.getView model)
-            let story = model.story |> Story.append slide
+        | AddFrameSlide before ->
+            let slide = Slide.frame model.provenance (Model.getView model) (Model.getRendering model)
+            let story = 
+                match before with
+                    | None -> model.story |> Story.append slide
+                    | Some b -> model.story |> Story.insertBefore' slide b
+
             { model with story = story
                          provenance = model.provenance |> Provenance.setHasFrames (Story.hasFrames story) }
 
-        | RemoveSlide slide ->
-            let story = model.story |> Story.remove slide
+        | RemoveSlide id ->
+            let story = model.story |> Story.remove' id
             { model with story = story
                          provenance = model.provenance |> Provenance.setHasFrames (Story.hasFrames story) }
 
@@ -88,21 +118,21 @@ let update (model : Model) (act : Action) =
             { model with presentation = false }
 
         | KeyDown Keys.Right 
-        | KeyDown Keys.Enter when model.presentation && Story.isActive model.story ->
+        | KeyDown Keys.Enter when model.story |> Story.isActive ->
             { model with story = Story.forward model.story } 
                 |> restoreSlide
 
         | KeyDown Keys.Left
-        | KeyDown Keys.Back when model.presentation && Story.isActive model.story ->
+        | KeyDown Keys.Back when model.story |> Story.isActive ->
             { model with story = Story.backward model.story } 
                 |> restoreSlide
 
         | NodeClick id ->
             { model with story = model.story |> Story.select None }
-                |> restore (Provenance.goto id model.provenance)
+                |> restore (Provenance.goto' id model.provenance)
 
-        | SlideClick slide ->
-            { model with story = model.story |> Story.goto slide }
+        | SlideClick id ->
+            { model with story = model.story |> Story.goto' id }
                 |> restoreSlide
 
         | UpdateConfig cfg ->
@@ -152,57 +182,111 @@ let provenanceView (model : MModel) =
     ]
 
 let storyboardView (model : MModel) =
-    let dependencies = [
+    let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "storyboardStyle"; url = "Storyboard.css" }
+        { kind = Script; name = "storyboardScript"; url = "Storyboard.js" }
     ]
+
+    let addSlideButton (before : SlideId option) =
+        onBoot "initAddButton($('#__ID__'))" (
+            div [clazz "add button"] [
+                div [clazz "ui icon button first"] [
+                    i [clazz "add icon"] []
+                ]
+                div [clazz "ui vertical buttons second"] [
+                    div [clazz "ui button"; onClick (fun _ -> AddFrameSlide before)] [
+                        i [clazz "camera icon"] []
+                        text "Frame"                        
+                    ]
+                    div [clazz "ui button"; onClick (fun _ -> AddTextSlide before)] [
+                        i [clazz "list icon"] []
+                        text "Text"
+                    ]
+                ]
+            ]
+        )
 
     let mkSlide sel slide =
         let atts = [
-            clazz "frame"
-            attribute "selected" (if sel then "true" else "false")
-            onClick (fun _ -> SlideClick slide)
+            clazz ("frame" + if sel then " selected" else "")
+            onClick (fun _ -> SlideClick slide.id)
         ]
 
-        (* TODO: Probably cleaner to do this in a *.js file *)
         div atts [
             img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ]
 
-            onBoot "$('#__ID__').click(function(e){ e.stopPropagation(); })" (
-                Svg.svg [ 
-                    clazz "removeButton"
-                    onClick (fun _ -> RemoveSlide slide)
+            onBoot "initRemoveButton($('#__ID__'))" (
+                div [ 
+                    clazz "ui icon remove button" 
+                    onClick (fun _ -> RemoveSlide slide.id)
                 ] [
-                    Svg.rect [
-                        attribute "width" "22px"; attribute "height" "20px";
-                        attribute "rx" "8px"; attribute "ry" "4px";
-                    ]
-                    Svg.path [ attribute "d" "M 5 4 L 17 16 M 5 16 L 17 4" ]
+                    i [clazz "remove icon"] []
                 ]
             )
         ]
 
     body [] [
         require dependencies (
-            Incremental.div 
-                (AttributeMap.ofList [ clazz "storyboard" ]) (
-                    alist {
-                        let! slides = model.story.slides
+            onBoot "" (
+                Incremental.div 
+                    (AttributeMap.ofList [ clazz "storyboard" ]) (
+                        alist {
+                            let! slides = model.story.slides
                         
-                        (* TODO: can this be done more cleanly? *)
-                        let! id = adaptive {
-                            let! s = model.story.selected
-                            match s with
-                                | None -> return SlideId ""
-                                | Some s -> return! s.id
+                            (* TODO: can this be done more cleanly? *)
+                            let! id = adaptive {
+                                let! s = model.story.selected
+                                match s with
+                                    | None -> return SlideId ""
+                                    | Some s -> return! s.id
+                            }
+
+                            for s in slides |> ZList.toList do
+                                yield onBoot "initPreviewFrame($('#__ID__'))" (
+                                    div [clazz "collapsing preview frame"] [ addSlideButton (Some s.id) ]
+                                )
+                                yield mkSlide (s.id = id) s
+
+                            yield div [clazz "static preview frame"] [
+                                yield addSlideButton None
+                            ]
                         }
-  
-                        yield! slides |> ZList.toList 
-                                      |> List.map (fun s -> mkSlide (s.id = id) s)
-                                      |> AList.ofList
-                    }
-                )
+                    )
+            )
         )
     ]
+
+let presentationView (model : MModel) =
+
+    let callbackRemove = adaptive {
+        let! sel = model.story.selected
+
+        if sel.IsNone then
+            return fun () -> RemoveSlide (SlideId "")
+        else
+            let! id = sel.Value.id
+            return fun () -> RemoveSlide id
+    }
+
+    require (Html.semui) (
+        body [clazz "ui"; style "background-color:#1B1C1E"] [
+            Html.SemUi.accordion "Rendering" "options" true [
+                model.appModel |> BoxSelectionApp.renderingControlsView |> UI.map AppAction
+            ]     
+
+            Html.SemUi.accordion "Slides" "film" true [
+
+                Html.SemUi.button (Some "minus") "Remove" 
+                                    (model.story.selected |> Mod.map Option.isSome)
+                                    callbackRemove
+
+                (*div [clazz "ui button"] [
+                    i [clazz "check icon"] []
+                    text "Apply"
+                ]*)
+            ]     
+        ]
+    )
 
 let view (model : MModel) =
     page (fun request ->
@@ -215,6 +299,8 @@ let view (model : MModel) =
                 provenanceView model
             | Some "storyboard" ->
                 storyboardView model
+            | Some "presentation" ->
+                presentationView model
             | Some other ->
                 let msg = sprintf "Unknown page: %A" other
                 body [] [
@@ -222,7 +308,7 @@ let view (model : MModel) =
                 ]  
             | None ->
                 model.dockConfig |> docking [
-                    style "width:100%; height:100%;"
+                    style "width:100%; height:100%; overflow:hidden"
                     onLayoutChanged UpdateConfig
                 ]
     )

@@ -1,5 +1,6 @@
 ﻿namespace Model
 
+open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Application
 open Aardvark.UI.Primitives
@@ -12,8 +13,10 @@ type Action =
     | AppAction          of AppAction
     | UpdateConfig       of DockConfig
     | NodeClick          of NodeId
-    | SlideClick         of Slide
-    | RemoveSlide        of Slide
+    | SlideClick         of SlideId
+    | RemoveSlide        of SlideId
+    | AddFrameSlide      of SlideId option
+    | AddTextSlide       of SlideId option
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
 
@@ -29,7 +32,7 @@ type Model = {
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Model =
 
-    let setView view model =
+    let setView (view : CameraView) (model : Model) =
         let app = model.appModel
         let cam = model.appModel.camera
 
@@ -37,5 +40,13 @@ module Model =
             appModel = { app with camera = { cam with view = view } }
         }
 
-    let getView model =
+    let getView (model : Model) =
         model.appModel.camera.view
+
+    let setRendering (rendering  : RenderingParams) (model : Model) =
+        { model with
+            appModel = { model.appModel with rendering = rendering }
+        }
+
+    let getRendering (model : Model) =
+        model.appModel.rendering

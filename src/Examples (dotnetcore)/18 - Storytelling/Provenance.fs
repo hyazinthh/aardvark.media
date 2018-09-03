@@ -195,7 +195,12 @@ module Provenance =
                 { prov with tree = t }
             )
 
-    let goto (id : NodeId) (prov : Provenance) =
+    let goto (node : Node) (prov : Provenance) =
+        { prov with tree = prov.tree 
+                                |> ZTree.root
+                                |> ZTree.find (fun n -> n.id = node.id) }
+
+    let goto' (id : NodeId) (prov : Provenance) =
         { prov with tree = prov.tree 
                                 |> ZTree.root
                                 |> ZTree.find (fun n -> n.id = id) }

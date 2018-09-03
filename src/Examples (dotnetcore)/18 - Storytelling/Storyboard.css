@@ -3,20 +3,33 @@
 }
 
 .storyboard {
+    width: 100%;
+    height: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 20px;
+    padding-bottom: 20px;
     display: flex;
     flex-wrap: nowrap;
+    align-items: stretch;
     overflow-x: auto;
     overflow-y: hidden;
     user-select: none;
 }
 
 .storyboard .frame {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;    
     border: 1px solid rgb(93, 97, 104);
     border-radius: 4px;
-    margin: 10px;
+    margin-left: 10px;
+    margin-right: 10px;
     padding: 5px;
-    min-width: 150px;
     width: 150px;
+    min-width: 150px;
+    max-width: 150px;
     height: 100px;
     user-select: none;
     background-color: rgb(55, 57, 61)
@@ -26,7 +39,7 @@
     max-width: 100%;
     max-height: 100%;
     display: block;
-    margin: 0 auto;
+    margin: auto;
     user-select: none;
     user-drag: none; 
     -moz-user-select: none;
@@ -35,41 +48,74 @@
     -ms-user-select: none;
 }
 
-.storyboard .frame:hover {
+.storyboard .frame:not(.static):hover {
+    cursor: pointer;
     box-shadow: 0 0 2px 1px rgba(50, 203, 253, 0.863);
 }
 
-.storyboard .frame[selected="true"] {
+.storyboard .frame.selected {
     box-shadow: 0 0 2px 1px rgba(190, 243, 45, 0.822);
 }
 
-.storyboard .frame .removeButton {
-    width: 22px;
-    height: 22px;
-    position: relative;
-    left: 112;
-    bottom: 86;
+.storyboard .frame .remove.button {
+    position: absolute;
+    padding: 5px;
+    margin: 5px;
+    right: 0;
+    top: 0;
     display: none;
+    opacity: 0.3;
 }
 
-.storyboard .frame:hover .removeButton {
+.storyboard .frame .remove.button:hover {
+    opacity: 0.8;
+}
+
+.storyboard .frame:hover .remove.button {
+    display: inline-block;
+}
+
+.storyboard .preview.frame {
+    border-style: dashed;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.storyboard .collapsing.preview.frame {
+    width: 10px;
+    min-width: 10px;
+    max-width: 10px;
+    height: 100px;
+    margin-left: 0px;
+    margin-right: 0px;
+    border-radius: 4px;
+}
+
+.storyboard .expanded.collapsing.preview.frame {
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
+}
+
+.storyboard .add.button {
+    opacity: 0.3
+}
+
+.storyboard .frame:hover .add.button {
+    opacity: 1.0
+}
+
+.storyboard .frame:hover .add.button {
     display: block;
 }
 
-.storyboard .frame .removeButton rect {
-    fill: rgba(188, 188, 188, 0.3);
+.storyboard .collapsing.preview.frame .add.button { 
+    display: none;
 }
 
-.storyboard .frame .removeButton:hover rect {
-    fill: rgba(188, 188, 188, 0.75);
+.storyboard .expanded.collapsing.preview.frame .add.button { 
+    display: block;
 }
 
-.storyboard .frame .removeButton path {
-    fill: none;
-    stroke: rgba(72, 72, 72, 0.6);
-    stroke-width: 3px;
-}
-
-.storyboard .frame .removeButton:hover path {
-    stroke: rgba(72, 72, 72, 0.9);
+.storyboard .add.button .second {
+    display: none;
 }

@@ -187,20 +187,12 @@ let renderView (model : MBoxSelectionModel) =
             style "width:100%; height: 100%"
         ]) scene
 
+let renderingControlsView (model : MBoxSelectionModel) = 
+    RenderingParameters.view model.rendering |> UI.map RenderingAction 
+
 let controlsView (model : MBoxSelectionModel) =
-
-    let semui = 
-        [ 
-            { kind = Stylesheet; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.css" } 
-            { kind = Script; name = "semui"; url = "https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.js" } 
-        ]
-
-    require (semui) (
+    require (Html.semui) (
         div [clazz "ui"; style "overflow:auto; background: #1B1C1E"] [
-            Html.SemUi.accordion "Rendering" "configure" true [
-                RenderingParameters.view model.rendering |> UI.map RenderingAction 
-            ]  
-
             Incremental.div AttributeMap.Empty (
                 alist {
                     let! empty = model.selectedBoxes

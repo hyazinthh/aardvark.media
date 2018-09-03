@@ -6,6 +6,8 @@ open Provenance
 open Aardvark.Rendering.Text
 open Aardvark.Base.Incremental
 
+open Model
+
 [<DomainType>]
 type Text = {
     position : V2d
@@ -15,7 +17,7 @@ type Text = {
 
 type Content =
     | TextContent of List<Text>
-    | FrameContent of Node * CameraView
+    | FrameContent of Node * CameraView * RenderingParams
 
 type SlideId = SlideId of string
 
@@ -36,9 +38,9 @@ module Slide =
     
     let private newId () = SlideId (Guid.NewGuid().ToString()) 
 
-    let frame (provenance : Provenance) (view : CameraView) = {
+    let frame (provenance : Provenance) (view : CameraView) (rendering : RenderingParams) = {
         id = newId ()
-        content = FrameContent (provenance.tree.Value, view)
+        content = FrameContent (provenance.tree.Value, view, rendering)
     }  
     
     let id (slide : Slide) =
@@ -49,6 +51,9 @@ module Slide =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Story =
+
+    let private findInList (slide : SlideId) (s : Story) =
+        s.slides |> ZList.find (fun s -> s.id = slide)
 
     let isActive (s : Story) =
         Option.isSome s.selected
@@ -64,18 +69,24 @@ module Story =
         s.slides |> ZList.tryFind (fun s -> 
             match s.content with
                 | TextContent _ -> false
-                | FrameContent (n, _) -> n.id = node.id
+                | FrameContent (n, _, _) -> n.id = node.id
         ) |> Option.isSome
 
-    let find (slide : Slide) (s : Story) =
-        s.slides |> ZList.find (fun s -> s.id = slide.id)
+    let tryFind (id : SlideId) (s : Story) =
+        s.slides |> ZList.tryFind (fun s -> s.id = id)
+                 |> Option.bind ZList.tryHead
+
+    let find (id : SlideId) (s : Story) =
+        match s |> tryFind id with
+            | None -> failwith "slide not found"
+            | Some s -> s
 
     let select (sel : Slide option) (s : Story) =
         { s with selected = sel }
 
     let forward (s : Story) =
         let r = s.selected |> Option.bind (fun x ->
-                    s |> find x
+                    s |> findInList x.id
                       |> ZList.right
                       |> Option.bind ZList.tryHead )
 
@@ -83,7 +94,7 @@ module Story =
 
     let backward (s : Story) =
         let l = s.selected |> Option.bind (fun x ->
-                    s |> find x
+                    s |> findInList x.id
                       |> ZList.left
                       |> Option.bind ZList.tryHead )
 
@@ -92,10 +103,25 @@ module Story =
     let goto (slide : Slide) (s : Story) =
         { s with selected = Some slide }
 
+    let goto' (id : SlideId) (s : Story) =
+        s |> goto (s |> find id)
+
     let append (slide : Slide) (s : Story) =
-        { slides = s.slides |> ZList.append slide
-          selected = Some slide }
+        { s with slides = s.slides |> ZList.append slide
+                 selected = Some slide }
+
+    let insertBefore' (slide : Slide) (before : SlideId) (s : Story) =
+        { s with slides = s.slides |> ZList.find (fun s -> s.id = before) 
+                                   |> ZList.insertBefore slide
+                 selected = Some slide }
+
+    let insertBefore (slide : Slide) (before : Slide) (s : Story) =
+        s |> insertBefore' slide before.id
 
     let remove (slide : Slide) (s : Story) =
-        { slides = s.slides |> ZList.remove (fun s -> s.id = slide.id)
-          selected = s.selected |> Option.bind (fun s -> if s.id = slide.id then None else Some s) }
+        { s with slides = s.slides |> ZList.remove (fun s -> s.id = slide.id)
+                 selected = s.selected |> Option.bind (fun s -> if s.id = slide.id then None else Some s) }
+
+    let remove' (id : SlideId) (s : Story) =
+        s |> remove (s |> find id)
+        
