@@ -37,8 +37,8 @@ function onButtonHover(btn, from, to, hover) {
 	});
 }
 
-function initRemoveButton(btn) {
-    btn.click( function(e) { e.stopPropagation(); } )   
+function disableClickPropagation(elem) {
+    elem.click( function(e) { e.stopPropagation(); } )   
 }
 
 function initAddButton(btn) {

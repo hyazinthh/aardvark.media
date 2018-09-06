@@ -18,6 +18,8 @@
     <ProjectReference Include="..\10 - Drawing3D\10 - Drawing3D.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Overlay.css" />
+    <EmbeddedResource Include="Presentation.css" />
     <EmbeddedResource Include="Storyboard.js" />
     <EmbeddedResource Include="Storyboard.css" />
     <EmbeddedResource Include="Provenance.css" />
@@ -29,6 +31,7 @@
     <Compile Include="Decision.fs" />
     <Compile Include="ZTree.fs" />
     <Compile Include="ZList.fs" />
+    <Compile Include="Reduced.fs" />
     <Compile Include="Provenance.fs" />
     <Compile Include="Story.fs" />
     <Compile Include="Model.fs" />

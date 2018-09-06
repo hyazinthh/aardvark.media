@@ -1,12 +1,13 @@
 namespace Story
 
 open System
+open System.Collections.Generic
 open Aardvark.Base
-open Provenance
 open Aardvark.Rendering.Text
 open Aardvark.Base.Incremental
 
 open Model
+open Provenance
 
 [<DomainType>]
 type Text = {
@@ -15,9 +16,15 @@ type Text = {
     text : string
 }
 
+[<DomainType>]
+type PresentationParams = {
+    view : Reduced.CameraView;
+    rendering : RenderingParams;
+}
+
 type Content =
     | TextContent of List<Text>
-    | FrameContent of Node * CameraView * RenderingParams
+    | FrameContent of Node * PresentationParams
 
 type SlideId = SlideId of string
 
@@ -38,9 +45,9 @@ module Slide =
     
     let private newId () = SlideId (Guid.NewGuid().ToString()) 
 
-    let frame (provenance : Provenance) (view : CameraView) (rendering : RenderingParams) = {
+    let frame (provenance : Provenance) (presentation : PresentationParams) = {
         id = newId ()
-        content = FrameContent (provenance.tree.Value, view, rendering)
+        content = FrameContent (provenance.tree.Value, presentation)
     }  
     
     let id (slide : Slide) =
@@ -55,6 +62,11 @@ module Story =
     let private findInList (slide : SlideId) (s : Story) =
         s.slides |> ZList.find (fun s -> s.id = slide)
 
+    let empty = {
+        slides = ZList.empty
+        selected = None
+    }
+
     let isActive (s : Story) =
         Option.isSome s.selected
 
@@ -62,24 +74,23 @@ module Story =
 
     let selected (s : Story) =
         match trySelected s with
-            | None -> failwith "No slide selected"
+            | None -> raise (ArgumentException ("No slide selected"))
             | Some s -> s
 
-    let hasFrames (s : Story) (node : Node) =
-        s.slides |> ZList.tryFind (fun s -> 
-            match s.content with
+    let persistNode (s : Story) (node : Node) =
+        s.slides |> ZList.tryFind (fun x ->
+            match x.content with
                 | TextContent _ -> false
-                | FrameContent (n, _, _) -> n.id = node.id
+                | FrameContent (n, _) -> (n.id = node.id) && (s.selected <> Some x)
         ) |> Option.isSome
 
-    let tryFind (id : SlideId) (s : Story) =
-        s.slides |> ZList.tryFind (fun s -> s.id = id)
-                 |> Option.bind ZList.tryHead
+    let tryFindIndex (slide : Slide) (s : Story) =
+        s.slides |> ZList.tryFindIndex (fun s -> s.id = slide.id)
 
-    let find (id : SlideId) (s : Story) =
-        match s |> tryFind id with
-            | None -> failwith "slide not found"
-            | Some s -> s
+    let findIndex (slide : Slide) (s : Story) =
+        match (s |> tryFindIndex slide) with
+            | None -> raise (KeyNotFoundException ())
+            | Some i -> i
 
     let select (sel : Slide option) (s : Story) =
         { s with selected = sel }
@@ -103,25 +114,42 @@ module Story =
     let goto (slide : Slide) (s : Story) =
         { s with selected = Some slide }
 
-    let goto' (id : SlideId) (s : Story) =
-        s |> goto (s |> find id)
-
     let append (slide : Slide) (s : Story) =
         { s with slides = s.slides |> ZList.append slide
                  selected = Some slide }
 
-    let insertBefore' (slide : Slide) (before : SlideId) (s : Story) =
-        { s with slides = s.slides |> ZList.find (fun s -> s.id = before) 
+    let insertBefore (slide : Slide) (before : Slide) (s : Story) =
+        { s with slides = s.slides |> ZList.find (fun s -> s.id = before.id)
                                    |> ZList.insertBefore slide
                  selected = Some slide }
-
-    let insertBefore (slide : Slide) (before : Slide) (s : Story) =
-        s |> insertBefore' slide before.id
 
     let remove (slide : Slide) (s : Story) =
         { s with slides = s.slides |> ZList.remove (fun s -> s.id = slide.id)
                  selected = s.selected |> Option.bind (fun s -> if s.id = slide.id then None else Some s) }
 
-    let remove' (id : SlideId) (s : Story) =
-        s |> remove (s |> find id)
-        
+    let set (slide : Slide) (value : Slide) (s : Story) =
+        { s with slides = s.slides |> ZList.find (fun s -> s.id = slide.id)
+                                   |> ZList.set value
+                 selected = if s.selected = Some slide then
+                                Some value
+                            else
+                                s.selected }
+
+    let length (s : Story) =
+        s.slides |> ZList.length
+
+    let toList (s : Story) =
+        s.slides |> ZList.toList
+
+    let update (provenance : Provenance) (presentation : PresentationParams) (s : Story) =
+        s.selected |> Option.map (fun sel ->
+            match sel.content with
+                | FrameContent (n, p) when (n, p) <> (provenance.tree.Value, presentation) ->
+                    let x = { sel with content = FrameContent (provenance.tree.Value, presentation) }
+                    s |> set sel x
+                | _ -> s
+        )
+        |> Option.defaultValue s
+
+    let updateProvenance (s : Story) (provenance : Provenance) =
+        provenance |> Provenance.setPersistForStory (persistNode s)

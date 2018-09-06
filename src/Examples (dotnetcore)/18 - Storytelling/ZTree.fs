@@ -1,5 +1,7 @@
 ﻿namespace Aardvark.Base
 
+open System.Collections.Generic
+
 // The inner representation of the tree as nodes
 type private ZTreeNode<'a> = {
     value : 'a
@@ -90,7 +92,7 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
     member x.Find (predicate : 'a -> bool) =
         match x.TryFind predicate with
             | Some t -> t
-            | None -> failwith "Not found"
+            | None -> raise (KeyNotFoundException ())
 
     member x.FilterChildren (predicate : 'a -> bool) =
         let rec filter accum left = function

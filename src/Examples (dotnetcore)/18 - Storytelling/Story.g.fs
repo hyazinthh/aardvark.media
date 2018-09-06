@@ -65,6 +65,52 @@ module Mutable =
                 }
     
     
+    type MPresentationParams(__initial : Story.PresentationParams) =
+        inherit obj()
+        let mutable __current : Aardvark.Base.Incremental.IModRef<Story.PresentationParams> = Aardvark.Base.Incremental.EqModRef<Story.PresentationParams>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.PresentationParams>
+        let _view = Provenance.Reduced.Mutable.MCameraView.Create(__initial.view)
+        let _rendering = RenderingParametersModel.Mutable.MRenderingParameters.Create(__initial.rendering)
+        
+        member x.view = _view
+        member x.rendering = _rendering
+        
+        member x.Current = __current :> IMod<_>
+        member x.Update(v : Story.PresentationParams) =
+            if not (System.Object.ReferenceEquals(__current.Value, v)) then
+                __current.Value <- v
+                
+                Provenance.Reduced.Mutable.MCameraView.Update(_view, v.view)
+                RenderingParametersModel.Mutable.MRenderingParameters.Update(_rendering, v.rendering)
+                
+        
+        static member Create(__initial : Story.PresentationParams) : MPresentationParams = MPresentationParams(__initial)
+        static member Update(m : MPresentationParams, v : Story.PresentationParams) = m.Update(v)
+        
+        override x.ToString() = __current.Value.ToString()
+        member x.AsString = sprintf "%A" __current.Value
+        interface IUpdatable<Story.PresentationParams> with
+            member x.Update v = x.Update v
+    
+    
+    
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module PresentationParams =
+        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+        module Lens =
+            let view =
+                { new Lens<Story.PresentationParams, Provenance.Reduced.CameraView>() with
+                    override x.Get(r) = r.view
+                    override x.Set(r,v) = { r with view = v }
+                    override x.Update(r,f) = { r with view = f r.view }
+                }
+            let rendering =
+                { new Lens<Story.PresentationParams, RenderingParametersModel.RenderingParameters>() with
+                    override x.Get(r) = r.rendering
+                    override x.Set(r,v) = { r with rendering = v }
+                    override x.Update(r,f) = { r with rendering = f r.rendering }
+                }
+    
+    
     type MSlide(__initial : Story.Slide) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Slide> = Aardvark.Base.Incremental.EqModRef<Story.Slide>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Slide>

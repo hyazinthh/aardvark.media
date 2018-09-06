@@ -5,86 +5,26 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 
 open Model
-open BoxSelection
-
-type Message =
-    | Scale            of BoxId
-    | Rotate           of BoxId
-    | Translate        of BoxId
-    | AddBox
-    | RemoveBox
-    | Unknown
-
-[<DomainType>]
-type State = {
-    boxes : hmap<BoxId,VisibleBox>
-    nextColor : ColorIndex
-}
 
 type NodeId = NodeId of string
 
 [<DomainType>]
 type Node = {
     id : NodeId
-    state : State
-    message : Option<Message>
+    state : Reduced.State
+    message : Option<Reduced.Message>
 }
 
 [<DomainType>]
 type Provenance = {
     tree : ZTree<Node>
-    hasFrames : Node -> bool
+    persistForStory : Node -> bool    // Returns if changing the node would break the story
 }
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Message =
-    
-    let create = function
-        | AppAction.Scale (id, _) -> Scale id
-        | AppAction.Rotate (id, _) -> Rotate id
-        | AppAction.Translate (id, _) -> Translate id
-        | AppAction.AddBox -> AddBox
-        | AppAction.RemoveBox -> RemoveBox
-        | _ -> Unknown
-
-    let toString = function
-        | Scale _       -> "S"
-        | Rotate _      -> "R"
-        | Translate _   -> "T"
-        | AddBox        -> "A"
-        | RemoveBox     -> "D"
-        | Unknown       -> ""
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module State =
-    
-    let create (s : AppModel) =
-        { boxes = s.boxes
-          nextColor = s.nextColor }
-        
-    let restore (current : AppModel) (s : State) =
-        { current with boxes = s.boxes
-                       nextColor = s.nextColor 
-                       selectedBoxes = HSet.empty }
-
-    let boxes (s : State) = s.boxes
-
-    let nextColor (s : State) = s.nextColor
-
-    let equal (a : State) (b : State) =
-        let boxEqual (x, a) (y, b) =
-            x = y && 
-            a.color = b.color &&
-            a.geometry = b.geometry &&
-            a.transform.pose = b.transform.pose
-
-        a.boxes.Count = b.boxes.Count
-            |> (&&) (Seq.map2 boxEqual (HMap.toSeq a.boxes) (HMap.toSeq b.boxes) |> Seq.forall id)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Node =
 
-    let create (s : State) (m : Message option) = 
+    let create (s : Reduced.State) (m : Reduced.Message option) =
         { id = NodeId (Guid.NewGuid().ToString())
           state = s
           message = m }
@@ -100,43 +40,43 @@ module Node =
         yield "id", id
 
         match n.message with
-            | Some m -> yield "msg", (Message.toString m)
+            | Some m -> yield "msg", (Reduced.Message.toString m)
             | None -> ()
     ]
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Provenance =
 
-    let private checkMessage msg input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
-                if msg = Unknown then
+    let private checkMessage (msg : Reduced.Message) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
+                if msg = Reduced.Unknown then
                     Decided tree
                 else
                     Undecided tree 
         )
 
-    let private checkStateChanged state input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
-                if State.equal tree.Value.state state then
+    let private checkStateChanged (state : Reduced.State) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
+                if tree.Value.state = state then
                     Decided tree
                 else
                     Undecided tree 
         )
 
-    let private checkParent state input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
+    let private checkParent (state : Reduced.State) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
             match tree.Parent with
-                | Some p when (State.equal p.Value.state state) ->
+                | Some p when (p.Value.state = state) ->
                     Decided p
                 | _ ->
                     Undecided tree
         ) 
 
-    let private checkChildren state msg input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
+    let private checkChildren (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
             let c =
                 tree |> ZTree.filterChildren (fun n ->
-                    (State.equal n.state state) && (n.message = Some msg)
+                    (n.state = state) && (n.message = Some msg)
                 )
             
             if List.length c > 1 then
@@ -147,15 +87,15 @@ module Provenance =
                 | t::_ -> Decided t
         ) 
 
-    let private coalesceWithCurrent state msg hasFrames input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
+    let private coalesceWithCurrent (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
             let node = tree.Value
 
             let coal = 
                 node |> Node.message
                      |> Option.map ((=) msg)
                      |> Option.defaultValue false
-                     |> (&&) (not (hasFrames node))
+                     |> (&&) (not (prov.persistForStory node))
                      |> (&&) (ZTree.isLeaf tree)                
 
             match coal with
@@ -166,11 +106,13 @@ module Provenance =
                     Undecided tree
         )
 
-    let private coalesceWithChild state msg input =
-        input |> Decision.map (fun (tree : ZTree<Node>) ->
+    let private coalesceWithChild (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+        input |> Decision.map (fun tree ->
             let c =
-                tree |> ZTree.filterChildren (fun n -> n.message = Some msg) 
-                     |> List.filter (fun t -> t.IsLeaf)
+                tree |> ZTree.filterChildren (fun n ->
+                            (n.message = Some msg) && not (prov.persistForStory n)
+                     )
+                     |> List.filter ZTree.isLeaf
 
             if List.length c > 1 then
                 Log.warn "Multiple leaf children to coalesce in provenance graph."
@@ -183,7 +125,7 @@ module Provenance =
                     Decided (t |> ZTree.set v)
         )
 
-    let private appendNew state msg input =
+    let private appendNew (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>)=
         input |> Decision.map (fun tree ->
             tree |> ZTree.insert (Node.create state (Some msg)) |> Decided
         )
@@ -207,8 +149,8 @@ module Provenance =
     
     let update (succ : AppModel) (act : AppAction) (prov : Provenance) =
 
-        let state = State.create succ
-        let msg = Message.create act
+        let state = Reduced.State.create succ
+        let msg = Reduced.Message.create act
 
         let t =
             Undecided prov.tree
@@ -216,23 +158,23 @@ module Provenance =
                 |> checkStateChanged state
                 |> checkParent state
                 |> checkChildren state msg
-                |> coalesceWithCurrent state msg prov.hasFrames
-                |> coalesceWithChild state msg
+                |> coalesceWithCurrent prov state msg
+                |> coalesceWithChild prov state msg
                 |> appendNew state msg
                 |> Decision.get
 
         { prov with tree = t }
 
     let restore (prov : Provenance) (model : AppModel) =
-        State.restore model prov.tree.Value.state
+        Reduced.State.restore model prov.tree.Value.state
 
     let init (model : AppModel) =
-        { tree = Node.create (State.create model) None
+        { tree = Node.create (Reduced.State.create model) None
                     |> ZTree.single 
-          hasFrames = fun _ -> false }
+          persistForStory = fun _ -> false }
 
     let updateNode (f : Node -> Node) (prov : Provenance) =
         { prov with tree = prov.tree |> ZTree.update f}
 
-    let setHasFrames (f : Node -> bool) (prov : Provenance) =
-        { prov with hasFrames = f }
+    let setPersistForStory (f : Node -> bool) (prov : Provenance) =
+        { prov with persistForStory = f }
