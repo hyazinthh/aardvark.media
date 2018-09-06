@@ -1,71 +1,85 @@
 ﻿namespace Aardvark.Base
 
+open System
 open System.Collections.Generic
 
-// The inner representation of the tree as nodes
-type private ZTreeNode<'a> = {
-    value : 'a
-    children : ZTreeNode<'a> list
-}
+module ZTreeInner = 
+    type Node<'a> = 
+        Node of 'a * Node<'a> list with
 
-// Path type for the zipper
-type private ZTreePath<'a> =
-    | Top of 'a
-    | Node of 'a * ZTreeNode<'a> list * ZTreePath<'a> * ZTreeNode<'a> list
+        member x.Value =
+            let (Node (v, _)) = x in v
 
-    member x.getValue =
-        match x with
-            | Top v
-            | Node (v, _, _, _) -> v
+        member x.Children =
+            let (Node (_, c)) = x in c
 
-// Zipper
-type private ZTreeLocation<'a> = L of ZTreeNode<'a> * ZTreePath<'a>
+    // Path type for the zipper
+    type Path<'a> =
+        | Top of 'a
+        | Inner of 'a * Node<'a> list * Path<'a> * Node<'a> list
 
-// The tree class which is just a wrapper for the
-// private zipper
-type ZTree<'a> private (location : ZTreeLocation<'a>) =
+        member x.getValue =
+            match x with
+                | Top v
+                | Inner (v, _, _, _) -> v
+           
+open ZTreeInner
 
-    let (L(t, p)) = location
+type ZTree<'a> =
+    | Empty
+    | Zipped of Node<'a> * Path<'a> with
 
     static member Single (value : 'a) =
-        let n = { value = value; children = [] }
-        ZTree (L (n, Top value))
+        Zipped (Node (value, []), Top value)
 
-    member x.Value = t.value
+    member x.TryValue =
+        match x with
+            | Empty -> None
+            | Zipped (n, _) -> Some n.Value
+
+    member x.Value =
+        match x.TryValue with
+            | None -> raise (ArgumentException ("Tree is empty"))
+            | Some v -> v
 
     member x.IsRoot =
-        match p with
-            | Top _ -> true
+        match x with
+            | Zipped (_, Top _) -> true
             | _ -> false
 
     member x.Left =
-        match p with
-            | Top _ | Node (_, [], _, _) -> 
+        match x with
+            | Empty
+            | Zipped (_, Top _) 
+            | Zipped (_, Inner (_, [], _, _)) -> 
                 None
-            | Node (_, l::left, up, right) -> 
-                Some (ZTree (L (l, Node (l.value, left, up, t::right))))
+            | Zipped (t, Inner (_, l::left, up, right)) -> 
+                Some (Zipped (l, Inner (l.Value, left, up, t::right)))
 
     member x.Right =
-        match p with
-            | Top _ | Node (_, _, _, []) -> 
+        match x with
+            | Empty
+            | Zipped (_, Top _)
+            | Zipped (_, Inner (_, _, _, [])) -> 
                 None
-            | Node (_, left, up, r::right) -> 
-                Some (ZTree (L (r, Node (r.value, t::left, up, right))))
+            | Zipped (t, Inner (_, left, up, r::right)) -> 
+                Some (Zipped (r, Inner (r.Value, t::left, up, right)))
 
     member x.Parent =
-        match p with
-            | Top _ -> 
+        match x with
+            | Empty
+            | Zipped (_, Top _) -> 
                 None
-            | Node (_, left, up, right) ->
-                Some (ZTree (L ({ value = up.getValue
-                                  children = List.rev left @ t::right }, up)
-                            )
-                     )
+            | Zipped (t, Inner (_, left, up, right)) ->
+                Some (Zipped (Node (up.getValue, List.rev left @ t::right), up))
 
     member x.Child =
-        match t.children with
-            | [] -> None
-            | x::xs -> Some (ZTree (L(x, Node(x.value, [], p, xs))))
+        match x with
+            | Empty
+            | Zipped (Node (_, []), _) ->
+                None
+            | Zipped (Node (_, x::xs), p) ->
+                Some (Zipped (x, Inner(x.Value, [], p, xs)))
 
     member x.Children =
         let rec sib accum (t : ZTree<'a>) =
@@ -77,11 +91,14 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | None -> []
             | Some t -> sib [] t
 
-    member x.Filter (predicate : 'a -> bool) = [
-            if predicate t.value then yield x
-            yield! x.Children 
-                        |> List.collect (fun t -> t.Filter predicate)
-        ]
+    member x.Filter (predicate : 'a -> bool) = 
+        match x with
+            | Empty -> []
+            | _ -> [
+                if predicate x.Value then yield x
+                yield! x.Children 
+                            |> List.collect (fun t -> t.Filter predicate)
+            ]
 
     // Find methods use filter, may be optimized
     member x.TryFind (predicate : 'a -> bool) =
@@ -95,18 +112,22 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | None -> raise (KeyNotFoundException ())
 
     member x.FilterChildren (predicate : 'a -> bool) =
-        let rec filter accum left = function
+        let rec filter path accum left = function
             | [] -> accum
-            | x::xs ->
-                let n = [ if (predicate x.value) then 
-                            yield ZTree (L (x, Node (x.value, left, p, xs))) ]
+            | (x : Node<'a>)::xs ->
+                let n = [ if (predicate x.Value) then 
+                            yield Zipped (x, Inner (x.Value, left, path, xs)) ]
                     
-                filter (n @ accum) (x::left) xs            
+                filter path (n @ accum) (x::left) xs            
 
-        filter [] [] t.children 
+        match x with
+            | Empty -> []
+            | Zipped (n, p) -> filter p [] [] n.Children 
 
     member x.IsLeaf =
-        t.children |> List.isEmpty
+        match x with
+            | Zipped (Node (_, []), _) -> true
+            | _ -> false
 
     member x.HasChildren =
         x.IsLeaf |> not
@@ -117,36 +138,48 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | Some p -> p.Root
 
     member x.Insert (value : 'a) =
-        let n = { value = value; children = [] }
-        ZTree (L (n, Node (value, [], p, t.children)))
+        match x with
+            | Empty ->
+                ZTree.Single value
+            | Zipped (t, p) ->
+                let n = Node (value, [])
+                Zipped (n, Inner (value, [], p, t.Children))
 
     member x.Set (value : 'a) =
-        let n = { t with value = value }
+        let set = function
+            | Top _ -> Top value
+            | Inner (_, left, up, right) -> Inner (value, left, up, right)
 
-        match p with
-            | Top _ -> 
-                ZTree (L (n, Top value))
-            | Node (_, left, up, right) ->
-                ZTree (L (n, Node (value, left, up, right)));
+        match x with
+            | Empty ->
+                ZTree.Single value
+            | Zipped (t, p) ->
+                let n = Node (value, t.Children)
+                Zipped (n, set p)
 
     member x.Update (f : 'a -> 'a) =
         x.Set (f x.Value)
 
     member x.Count =
-        let rec cnt t =
-            t.children |> List.fold (fun c t -> c + cnt t) 1
+        let rec cnt (t : Node<'a>) =
+            t.Children |> List.fold (fun c t -> c + cnt t) 1
 
-        cnt t
+        match x with
+            | Empty -> 0
+            | Zipped (t, _) -> cnt t
 
     member x.BranchingFactor =
-        let rec cnt t =
-            match t.children with
+        let rec cnt (t : Node<'a>) =
+            match t.Children with
                 | [] -> (0, 0)
                 | c -> c |> List.fold (fun (n, b) t ->
                                         let (i, j) = cnt t in (n + i, b + j)
-                                       ) (1, List.length t.children)
+                                       ) (1, List.length t.Children)
 
-        let (n, b) = cnt t in float b / float n
+        match x with
+            | Empty -> float 0
+            | Zipped (t, _) ->
+                let (n, b) = cnt t in float b / float n
 
     member x.ToJson (f : 'a -> (string * string) list) =
 
@@ -161,11 +194,13 @@ type ZTree<'a> private (location : ZTreeLocation<'a>) =
             | x::xs -> printNode x + ", " + printNodes xs
             | [] -> ""
 
-        and printNode t =
-            let props = f t.value
-            sprintf @"{ %s ""children"" : [ %s ] }" (printProperties props) (printNodes t.children)
+        and printNode (t : Node<'a>) =
+            let props = f t.Value
+            sprintf @"{ %s ""children"" : [ %s ] }" (printProperties props) (printNodes t.Children)
             
-        printNode t
+        match x with
+            | Empty -> ""
+            | Zipped (t, _) -> printNode t
             
 and 'a ztree = ZTree<'a>
 
