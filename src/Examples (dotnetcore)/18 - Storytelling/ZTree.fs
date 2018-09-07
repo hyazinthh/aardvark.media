@@ -18,7 +18,7 @@ module ZTreeInner =
         | Top of 'a
         | Inner of 'a * Node<'a> list * Path<'a> * Node<'a> list
 
-        member x.getValue =
+        member x.Value =
             match x with
                 | Top v
                 | Inner (v, _, _, _) -> v
@@ -71,7 +71,7 @@ type ZTree<'a> =
             | Zipped (_, Top _) -> 
                 None
             | Zipped (t, Inner (_, left, up, right)) ->
-                Some (Zipped (Node (up.getValue, List.rev left @ t::right), up))
+                Some (Zipped (Node (up.Value, List.rev left @ t::right), up))
 
     member x.Child =
         match x with
