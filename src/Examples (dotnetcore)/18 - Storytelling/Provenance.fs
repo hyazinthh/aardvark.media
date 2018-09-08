@@ -6,7 +6,26 @@ open Aardvark.Base.Incremental
 
 open Model
 
-type NodeId = NodeId of string
+type NodeId = 
+    private NodeId of Guid with
+
+    static member generate () =
+        NodeId (Guid.NewGuid ())
+
+    static member ofGuid (v : Guid) =
+        NodeId v
+
+    static member parse (s : string) =
+        s |> Guid.Parse |> NodeId
+
+    static member tryParse (s : string) =
+        try
+            Some (s |> Guid.Parse |> NodeId)
+        with
+            | _ -> None
+
+    override x.ToString () =
+        let (NodeId v) = x in string v
 
 [<DomainType>]
 type Node = {
@@ -25,7 +44,7 @@ type Provenance = {
 module Node =
 
     let create (s : Reduced.State) (m : Reduced.Message option) =
-        { id = NodeId (Guid.NewGuid().ToString())
+        { id = NodeId.generate ()
           state = s
           message = m }
 
@@ -37,10 +56,10 @@ module Node =
 
     let properties (n : Node) = [ 
         let (NodeId id) = n.id
-        yield "id", id
+        yield "id", (string id)
 
         match n.message with
-            | Some m -> yield "msg", (Reduced.Message.toString m)
+            | Some m -> yield "msg", (string m)
             | None -> ()
     ]
 

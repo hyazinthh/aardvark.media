@@ -16,6 +16,7 @@ type Action =
     | SlideClick         of Slide
     | RemoveSlide        of Slide
     | EditSlide          of Slide
+    | MoveSlide          of SlideId * SlideId option * SlideId option
     | AddFrameSlide      of Slide option
     | AddTextSlide       of Slide option
     | DeselectSlide
@@ -77,4 +78,4 @@ module Model =
 
     let setStory (story : Story) (model : Model) =
         { model with story = story
-                     provenance = model.provenance |> Story.updateProvenance story }
+                     provenance = model.provenance |> Story.Provenance.update story }

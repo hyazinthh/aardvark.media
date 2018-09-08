@@ -35,7 +35,13 @@ module Html =
             )
 
 let onNodeClick (cb : NodeId -> 'msg) =
-    onEvent "onnodeclick" [] (List.head >> Aardvark.UI.Pickler.unpickleOfJson >> NodeId >> cb)
+    onEvent "onnodeclick" [] (List.head >> Pickler.unpickleOfJson >> NodeId.parse >> cb)
+
+let onSlideMove (cb : SlideId * SlideId option * SlideId option -> 'msg) =
+    onEvent "onslidemove" [] (fun args ->
+        let x = args |> List.toArray|> Array.map (Pickler.unpickleOfJson >> SlideId.tryParse)
+        cb (x.[0].Value, x.[1], x.[2])
+    )
 
 let initial =
     let model = BoxSelectionApp.initial in {
@@ -105,6 +111,15 @@ let update (model : Model) (act : Action) =
 
         | RemoveSlide slide ->
             model |> Model.setStory (model.story |> Story.remove slide)
+
+        | MoveSlide (id, l, r) ->
+            let story = 
+                if l.IsSome then
+                    model.story |> Story.moveAfter' id l.Value
+                else
+                    model.story |> Story.moveBefore' id r.Value
+
+            model |> Model.setStory story
 
         | KeyDown Keys.R ->
             { model with dockConfig = initial.dockConfig }
@@ -187,10 +202,8 @@ let provenanceView (model : MModel) =
     let provenanceData = adaptive {
         let! p = model.provenance.tree
         
-        let (Provenance.NodeId current) = p.Value.id
         let t = p.Root.ToJson Provenance.Node.properties
-
-        return sprintf @"{ ""current"" : ""%s"" , ""tree"" : %s }" current t
+        return sprintf @"{ ""current"" : ""%s"" , ""tree"" : %s }" (string p.Value.id) t
     } 
 
     let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
@@ -233,28 +246,31 @@ let storyboardView (model : MModel) =
     let mkSlide (model : MModel) (selected : bool) (slide : Slide) =
         let atts = [
             clazz ("frame" + if selected then " selected" else "")
+            attribute "slide" (string slide.id)
             onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SlideClick slide))
         ]
 
-        Incremental.div (atts |> AttributeMap.ofList) (
-            alist {
-                yield img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ]
+        onBoot "setupDragEvents($('#__ID__'))" (
+            Incremental.div (atts |> AttributeMap.ofList) (
+                alist {
+                    yield img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ]
 
-                yield onBoot "disableClickPropagation($('#__ID__'))" (
-                    div [
-                        clazz "ui icon remove slide button"
-                        onClick (fun _ -> RemoveSlide slide)
-                    ] [
-                        i [clazz "remove icon"] []
+                    yield onBoot "disableClickPropagation($('#__ID__'))" (
+                        div [
+                            clazz "ui icon remove slide button"
+                            onClick (fun _ -> RemoveSlide slide)
+                        ] [
+                            i [clazz "remove icon"] []
+                        ]
+                    )
+
+                    let! index = model.story.Current |> Mod.map (Story.findIndex slide)
+
+                    yield div [clazz "ui floating blue label"] [
+                        text (string (index + 1))
                     ]
-                )
-
-                let! index = model.story.Current |> Mod.map (Story.findIndex slide)
-
-                yield div [clazz "ui floating blue label"] [
-                    text (string (index + 1))
-                ]
-            }
+                }
+            )
         )
 
     (* TODO: Won't need an edit button but probably an apply changes button
@@ -280,30 +296,42 @@ let storyboardView (model : MModel) =
 
     body [] [
         require dependencies (
-            onBoot "" (
-                Incremental.div 
-                    (AttributeMap.ofList [ clazz "storyboard" ]) (
-                        alist {
-                            let! slides = model.story.Current |> Mod.map Story.toList
-                            let! selected = model.story.Current |> Mod.map Story.trySelected
+            Incremental.div 
+                (AttributeMap.ofList [ clazz "storyboard"; onSlideMove MoveSlide ]) (
+                    alist {
+                        let! story = model.story.Current
 
-                            let cmp slide =
-                                match selected with
-                                    | None -> false
-                                    | Some s -> slide.id = s.id
+                        let cmp slide =
+                            match (story |> Story.trySelected) with
+                                | None -> false
+                                | Some s -> slide.id = s.id
 
-                            for s in slides do
-                                yield onBoot "initPreviewFrame($('#__ID__'))" (
-                                    div [clazz "collapsing preview frame"] [ addSlideButton (Some s) ]
-                                )
-                                yield s |> mkSlide model (cmp s)
+                        for s in (story |> Story.toList) do
+                            yield onBoot "initCollapsingFrame($('#__ID__'))" (
+                                let left = story |> Story.leftOf s 
+                                                 |> Option.map (Slide.id >> string)
 
-                            yield div [clazz "static preview frame"] [
-                                yield addSlideButton None
-                            ]
-                        }
-                    )
-            )
+                                div [
+                                    yield clazz "collapsing preview frame"
+                                    yield attribute "right" (string s.id)
+                                    if left.IsSome then 
+                                        yield attribute "left" left.Value
+                                ] [ addSlideButton (Some s) ]
+                            )
+                            yield s |> mkSlide model (cmp s)
+
+                        yield onBoot "setupDropEvents($('#__ID__'))" (
+                            let left = story |> Story.last 
+                                             |> Option.map (Slide.id >> string)
+
+                            div [
+                                yield clazz "static preview frame"
+                                if left.IsSome then
+                                    yield attribute "left" left.Value
+                            ] [ yield addSlideButton None ]
+                        )
+                    }
+                )
         )
     ]
 

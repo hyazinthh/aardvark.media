@@ -31,7 +31,6 @@
     min-width: 150px;
     max-width: 150px;
     height: 100px;
-    user-select: none;
     background-color: rgb(55, 57, 61)
 }
 
@@ -49,12 +48,11 @@
     max-height: 100%;
     display: block;
     margin: auto;
-    user-select: none;
-    user-drag: none; 
-    -moz-user-select: none;
-    -webkit-user-drag: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
+    pointer-events: none;
+}
+
+.storyboard .frame.droppable {
+    box-shadow: 0 0 2px 1px rgba(250, 253, 50, 0.863);
 }
 
 .storyboard .frame:not(.static):not(.selected):hover {
@@ -118,18 +116,18 @@
 }
 
 .storyboard .frame:hover .add.button {
-    opacity: 1.0
+    opacity: 1.0;
 }
 
-.storyboard .frame:hover .add.button {
-    display: block;
+.storyboard .droppable.preview.frame .add.button {
+    display: none;
 }
 
 .storyboard .collapsing.preview.frame .add.button { 
     display: none;
 }
 
-.storyboard .expanded.collapsing.preview.frame .add.button { 
+.storyboard:not(.dragging) .expanded.collapsing.preview.frame .add.button { 
     display: block;
 }
 

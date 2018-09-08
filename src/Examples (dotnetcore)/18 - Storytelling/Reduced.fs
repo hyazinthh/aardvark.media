@@ -28,7 +28,16 @@ type Message =
     | Translate        of BoxId
     | AddBox
     | RemoveBox
-    | Unknown
+    | Unknown 
+
+    override x.ToString () =
+        match x with
+            | Scale _       -> "S"
+            | Rotate _      -> "R"
+            | Translate _   -> "T"
+            | AddBox        -> "A"
+            | RemoveBox     -> "D"
+            | Unknown       -> ""
 
 type OTransformation = Transformation
 
@@ -86,14 +95,6 @@ module Message =
         | AppAction.AddBox -> AddBox
         | AppAction.RemoveBox -> RemoveBox
         | _ -> Unknown
-
-    let toString : (Message -> string) = function
-        | Scale _       -> "S"
-        | Rotate _      -> "R"
-        | Translate _   -> "T"
-        | AddBox        -> "A"
-        | RemoveBox     -> "D"
-        | Unknown       -> ""
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Transformation =
