@@ -18,12 +18,14 @@ module Mutable =
         let _provenance = Provenance.Mutable.MProvenance.Create(__initial.provenance)
         let _story = Story.Mutable.MStory.Create(__initial.story)
         let _presentation = ResetMod.Create(__initial.presentation)
+        let _thumbnailRequests = MSet.Create(unbox, __initial.thumbnailRequests, (fun v -> Story.Mutable.MSlide.Create(v)), (fun (m,v) -> Story.Mutable.MSlide.Update(m, v)), (fun v -> v))
         
         member x.appModel = _appModel
         member x.dockConfig = _dockConfig :> IMod<_>
         member x.provenance = _provenance
         member x.story = _story
         member x.presentation = _presentation :> IMod<_>
+        member x.thumbnailRequests = _thumbnailRequests :> aset<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Model.Model) =
@@ -35,6 +37,7 @@ module Mutable =
                 Provenance.Mutable.MProvenance.Update(_provenance, v.provenance)
                 Story.Mutable.MStory.Update(_story, v.story)
                 ResetMod.Update(_presentation,v.presentation)
+                MSet.Update(_thumbnailRequests, v.thumbnailRequests)
                 
         
         static member Create(__initial : Model.Model) : MModel = MModel(__initial)
@@ -80,4 +83,10 @@ module Mutable =
                     override x.Get(r) = r.presentation
                     override x.Set(r,v) = { r with presentation = v }
                     override x.Update(r,f) = { r with presentation = f r.presentation }
+                }
+            let thumbnailRequests =
+                { new Lens<Model.Model, Aardvark.Base.hset<Story.Slide>>() with
+                    override x.Get(r) = r.thumbnailRequests
+                    override x.Set(r,v) = { r with thumbnailRequests = v }
+                    override x.Update(r,f) = { r with thumbnailRequests = f r.thumbnailRequests }
                 }

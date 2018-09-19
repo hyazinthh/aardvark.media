@@ -1,47 +1,118 @@
 ﻿module App
 
+open System.Net
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.UI
 open Aardvark.UI.Primitives
 open Aardvark.Application
+open Aardvark.Service.Server
 
 open Model
 open Provenance
 open Story
 
-module Html =
+module Model = 
 
-    module SemUi =
+    module Provenance =
+        // Updates the provenance unless the mapping returns None
+        let updateMaybe (f : Provenance -> Provenance option) (model : Model) =
+            match (model.provenance |> f) with
+                | None -> model
+                | Some p ->
+                    { model with provenance = p }
 
-        let button (icon : string option) (label : string) (enabled : IMod<bool>) (callback : IMod<(unit -> 'a) option>) =
+        // Updates the provenance
+        let update (f : Provenance -> Provenance) (model : Model) =
+            updateMaybe (f >> Some) model
 
-            let attributes = amap {
-                let! enabled = enabled
-                let! cb = callback
+        // Restores the model from provenance
+        let restore (model : Model) =
+            { model with appModel = model.appModel |> Provenance.restore model.provenance }
 
-                yield clazz ("ui button " + if enabled then "" else "disabled")
+    module Story =
 
-                if cb.IsSome then
-                    yield onClick cb.Value
-            }
+        [<AutoOpen>]
+        module private Helpers =
+            // Updates the currently selected slide (if not None)
+            // with changes from model
+            let saveChanges (model : Model) =
 
-            Incremental.div (attributes |> AttributeMap.ofAMap) (
-                alist {
-                    if icon.IsSome then 
-                        yield i [clazz ("icon " + icon.Value)] []
-                    yield text label
-                }
-            )
+                let updateSelected (sel : Slide) =
+                    match sel.content with
+                        | TextContent _ -> sel
+                        | FrameContent _ ->
+                            Slide.Lens.content.Set (sel, model |> Model.getFrame)
 
-let onNodeClick (cb : NodeId -> 'msg) =
-    onEvent "onnodeclick" [] (List.head >> Pickler.unpickleOfJson >> NodeId.parse >> cb)
+                let updateStory (s : Story) =
+                    match s.selected with
+                        | None -> s
+                        | Some sel ->
+                            s |> Story.saveChanges (sel |> updateSelected)
 
-let onSlideMove (cb : SlideId * SlideId option * SlideId option -> 'msg) =
-    onEvent "onslidemove" [] (fun args ->
-        let x = args |> List.toArray|> Array.map (Pickler.unpickleOfJson >> SlideId.tryParse)
-        cb (x.[0].Value, x.[1], x.[2])
-    )
+                model.story |> updateStory
+
+        // Sets the story and updates the provenance
+        // accordingly
+        let update (f : Story -> Story) (model : Model) =
+            let story = model |> saveChanges |> f
+            
+            model |> Lens.set Model.Lens.story story
+                  |> Lens.set Model.Lens.provenance (model.provenance |> Story.Provenance.update story)
+
+        // Restores the model from the selected slide
+        let restore (model : Model) =
+            match model.story |> Story.selected |> Slide.content with
+                | FrameContent (node, presentation) ->
+                    model |> Model.setPresentation presentation
+                          |> Provenance.update (Provenance.goto node)
+                          |> Provenance.restore
+                | _ -> 
+                    model
+        
+        // Requests a thumbnail for the given slide
+        let requestThumbnail (slide : Slide) (model : Model) =
+            model |> Lens.update Model.Lens.thumbnailRequests (HSet.add slide)
+
+        // Remove a thumbnail request
+        let removeThumbnailRequest (slide : Slide) (model : Model) =
+            model |> Lens.update Model.Lens.thumbnailRequests (HSet.remove slide)
+            
+
+
+ module Events =
+    // Fired when a node is clicked 
+    let onNodeClick (cb : NodeId -> 'msg) =
+        onEvent "onnodeclick" [] (List.head >> Pickler.unpickleOfJson >> NodeId.parse >> cb)
+
+    // Fired when a slide is dragged and dropped
+    let onSlideMove (cb : SlideId * SlideId option * SlideId option -> 'msg) =
+        onEvent "onslidemove" [] (fun args ->
+            let x = args |> List.toArray|> Array.map (Pickler.unpickleOfJson >> SlideId.tryParse)
+            cb (x.[0].Value, x.[1], x.[2])
+        )
+
+module Thumbnail =
+
+    [<AutoOpen>]
+    module private Helpers = 
+
+        let baseAddress = "http://localhost:4321"
+
+        let controlId = lazy (
+            use wc = new WebClient ()
+            let result = wc.DownloadString (sprintf "%s/rendering/stats.json" baseAddress)
+            let stats : ClientStatistics list =
+                   result |> Pickler.unpickleOfJson           
+
+            stats.Head.name
+        )
+
+    // Creates a thumbnail by taking a screenshot
+    let create () =
+        use wc = new WebClient ()
+        wc.DownloadData (sprintf "%s/rendering/screenshot/%s?w=256&h=196&samples=8" baseAddress controlId.Value)
+            |> Thumbnail.create
 
 let initial =
     let model = BoxSelectionApp.initial in {
@@ -70,56 +141,42 @@ let initial =
         provenance = model |> Provenance.init
         story = Story.empty
         presentation = false
+        thumbnailRequests = HSet.empty
     }
-
-let restore prov model =
-    { model with appModel = model.appModel |> Provenance.restore prov
-                 provenance = prov }
-
-let restoreSlide model =
-    match model.story |> Story.selected |> Slide.content with
-        | FrameContent (node, presentation) ->
-            model |> Model.setPresentation presentation
-                  |> restore (model.provenance |> Provenance.goto node )
-        | _ -> 
-            model
 
 let update (model : Model) (act : Action) = 
     match act with
         | AppAction a -> 
             let succ = BoxSelectionApp.update model.appModel a
             let prov = model.provenance |> Provenance.update succ a
-            let story = model.story |> Story.update prov (AppModel.getPresentation succ)
-
-            { model with appModel = succ
-                         provenance = prov }
-                |> Model.setStory story
+            
+            model |> Lens.set Model.Lens.appModel succ
+                  |> Lens.set Model.Lens.provenance prov
 
         | KeyDown Keys.Z ->
-            match (Provenance.undo model.provenance) with
-                | Some prov -> model |> restore prov
-                | None -> model
+            model |> Model.Provenance.updateMaybe Provenance.undo
 
         | AddFrameSlide before ->
-            let slide = Slide.frame model.provenance (Model.getPresentation model)
+            let slide = Slide.frame model.provenance (Model.getPresentation model) Thumbnail.empty
             let story = 
                 match before with
-                    | None -> model.story |> Story.append slide
-                    | Some b -> model.story |> Story.insertBefore slide b
+                    | None -> Story.append slide
+                    | Some id -> Story.insertBeforeById slide id
 
-            model |> Model.setStory story
+            model |> Model.Story.update story
+                  |> Model.Story.requestThumbnail slide
 
-        | RemoveSlide slide ->
-            model |> Model.setStory (model.story |> Story.remove slide)
+        | RemoveSlide id ->
+            model |> Model.Story.update (Story.removeById id)
 
         | MoveSlide (id, l, r) ->
             let story = 
                 if l.IsSome then
-                    model.story |> Story.moveAfter' id l.Value
+                    Story.moveAfterById id l.Value
                 else
-                    model.story |> Story.moveBefore' id r.Value
+                    Story.moveBeforeById id r.Value
 
-            model |> Model.setStory story
+            model |> Model.Story.update story
 
         | KeyDown Keys.R ->
             { model with dockConfig = initial.dockConfig }
@@ -132,30 +189,94 @@ let update (model : Model) (act : Action) =
 
         | KeyDown Keys.Right 
         | KeyDown Keys.Enter when model.story |> Story.isActive ->
-            model |> Model.setStory (model.story |> Story.forward)
-                  |> restoreSlide
+            model |> Model.Story.update Story.forward
+                  |> Model.Story.restore
 
         | KeyDown Keys.Left
         | KeyDown Keys.Back when model.story |> Story.isActive ->
-            model |> Model.setStory (model.story |> Story.backward)
-                  |> restoreSlide
+            model |> Model.Story.update Story.backward
+                  |> Model.Story.restore
 
         | NodeClick id ->
-            model |> Model.setStory (model.story |> Story.select None)
-                  |> restore (model.provenance |> Provenance.goto' id)
+            model |> Model.Story.update (Story.select None)
+                  |> Model.Provenance.update (Provenance.goto' id)
+                  |> Model.Provenance.restore
 
-        | SlideClick slide ->
-            model |> Model.setStory (model.story |> Story.goto slide)
-                  |> restoreSlide
+        | SlideClick id ->
+            model |> Model.Story.update (Story.selectById (Some id))
+                  |> Model.Story.restore
 
         | DeselectSlide ->
-            model |> Model.setStory (model.story |> Story.select None)
+            model |> Model.Story.update (Story.select None)
+
+        | ThumbnailUpdated slide ->
+            if model.story |> Story.contains slide then
+                model |> Model.Story.update (Story.set slide slide)
+            else
+                model
+            |> Model.Story.removeThumbnailRequest slide
 
         | UpdateConfig cfg ->
             { model with dockConfig = cfg }
 
         | _ -> 
             model
+
+
+let threads (model : Model) =
+    
+    // Thread pool for actual application
+    let appThreads = model.appModel |> BoxSelectionApp.app.threads 
+                                    |> ThreadPool.map AppAction
+
+    // Threads for creating thumbnails
+    let thumbnailRequests =
+
+        let thumbnailProc slide =
+            proclist {
+                do! Async.SwitchToNewThread ()
+                yield ThumbnailUpdated { 
+                    slide with thumbnail = Thumbnail.create ()
+                }
+            }
+
+        model.thumbnailRequests
+            |> HSet.fold (fun p s ->
+                p |> ThreadPool.add (string s.id) (thumbnailProc s)
+            ) ThreadPool.empty
+
+    // Thread for keeping the thumbnail of the selected
+    // slide updated
+    let thumbnailUpdater =
+
+        let updateProc (selected : Slide) =
+            let rec proc () =
+                proclist {
+                    yield ThumbnailUpdated {
+                        selected with thumbnail = Thumbnail.create ()
+                    }
+
+                    do! Async.Sleep 1000
+                    yield! proc ()
+                }
+            
+            proclist {
+                do! Async.SwitchToNewThread ()
+                yield! proc ()
+            }
+    
+        let spawn (selected : Slide) =
+            selected |> updateProc |> ThreadPool.single ("u" + (string selected.id))
+
+        // Only run if there is actually a frame selected
+        model.story |> Story.trySelected
+                    |> Option.filter Slide.isFrame
+                    |> Option.map spawn
+                    |> Option.defaultValue ThreadPool.empty
+
+    [appThreads; thumbnailRequests; thumbnailUpdater]
+        |> ThreadPool.unionMany
+
 
 let renderView (model : MModel) =
     let dependencies = Html.semui @ [
@@ -170,7 +291,7 @@ let renderView (model : MModel) =
         require (dependencies) (
             Incremental.div (AttributeMap.ofList [ clazz "render overlay"]) (
                 alist {
-                    let! active = model.story.Current |> Mod.map Story.isActive
+                    let! active = model.story.selected |> Mod.map Option.isSome
 
                     if active then
                         yield div [clazz "frame"] [
@@ -208,7 +329,7 @@ let provenanceView (model : MModel) =
 
     let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
 
-    body [ onNodeClick NodeClick ] [
+    body [ Events.onNodeClick NodeClick ] [
         require dependencies (
             onBoot "initChart();" (
                 onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
@@ -224,7 +345,7 @@ let storyboardView (model : MModel) =
         { kind = Script; name = "storyboardScript"; url = "Storyboard.js" }
     ]
 
-    let addSlideButton (before : Slide option) =
+    let addSlideButton (before : SlideId option) =
         onBoot "initAddButton($('#__ID__'))" (
             div [clazz "add button"] [
                 div [clazz "ui icon button first"] [
@@ -241,95 +362,99 @@ let storyboardView (model : MModel) =
                     ]
                 ]
             ]
-        )
+        )   
 
-    let mkSlide (model : MModel) (selected : bool) (slide : Slide) =
-        let atts = [
-            clazz ("frame" + if selected then " selected" else "")
-            attribute "slide" (string slide.id)
-            onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SlideClick slide))
-        ]
+    let mkCollapsingFrame (model : MModel) (slide : MSlide) =
+        alist {
+            let! id = slide.id
 
-        onBoot "setupDragEvents($('#__ID__'))" (
-            Incremental.div (atts |> AttributeMap.ofList) (
-                alist {
-                    yield img [ attribute "src" "https://upload.wikimedia.org/wikipedia/commons/6/67/SanWild17.jpg" ]
+            // TODO: Optimize! This depends on the whole story record!
+            let! slide = slide.Current
+            let! prev = model.story.Current |> Mod.map (fun s ->
+                            s |> Story.leftOf slide |> Option.map (Slide.id >> string)
+                        )
 
+            yield onBoot "initCollapsingFrame($('#__ID__'))" (
+                div [
+                    yield clazz "collapsing preview frame"
+                    yield attribute "right" (string id)
+                    if prev.IsSome then 
+                        yield attribute "left" prev.Value
+                ] [ addSlideButton (Some id) ]
+            )
+        }
+
+    let mkStaticFrame (model : MModel) =
+        alist {
+            // TODO: Optimize! This depends on the whole story record!
+            let! last = model.story.Current |> Mod.map (fun s ->
+                            s |> Story.last |> Option.map (Slide.id >> string)
+                        )
+
+            yield onBoot "setupDropEvents($('#__ID__'))" (
+                div [
+                    yield clazz "static preview frame"
+                    if last.IsSome then
+                        yield attribute "left" last.Value
+                ] [ yield addSlideButton None ]
+            )
+        }
+        
+
+    let mkSlide (model : MModel) (slide : MSlide)  =
+        alist {
+            let! id = slide.id
+            let! thumbnail = slide.thumbnail
+
+            // TODO: Optimize! This depends on the whole story record!
+            let! slide = slide.Current
+            let! index = model.story.Current |> Mod.map (Story.findIndex slide)
+
+            let! selected = adaptive {
+                let! sel = model.story.selected
+
+                match sel with
+                    | None -> return false
+                    | Some x -> return! x.id |> Mod.map ((=) id)
+            }
+
+            let atts = [
+                clazz ("frame" + if selected then " selected" else "")
+                attribute "slide" (string id)
+                onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SlideClick id))
+            ]
+
+            let boot = "setupDragEvents($('#__ID__')); " +
+                       (sprintf "setupThumbnail($('#__ID__'), '%A')" thumbnail)
+
+            yield onBoot boot (
+                div atts [
                     yield onBoot "disableClickPropagation($('#__ID__'))" (
                         div [
                             clazz "ui icon remove slide button"
-                            onClick (fun _ -> RemoveSlide slide)
+                            onClick (fun _ -> RemoveSlide id)
                         ] [
                             i [clazz "remove icon"] []
                         ]
                     )
 
-                    let! index = model.story.Current |> Mod.map (Story.findIndex slide)
-
                     yield div [clazz "ui floating blue label"] [
                         text (string (index + 1))
                     ]
-                }
-            )
-        )
-
-    (* TODO: Won't need an edit button but probably an apply changes button
-                on a per slide basis that allows the current state to be saved in an unselected
-                frame *)
-
-            (*let changed = adaptive {
-                let! presentation = model.Current |> Mod.map Model.getPresentation
-
-                return match slide.content with
-                        | FrameContent (n, p) -> p = presentation
-                        | TextContent _ -> false
-            }
-
-            yield onBoot "disableClickPropagation($('#__ID__'))" (
-                div [ 
-                    clazz "ui icon edit slide button"
-                    onClick (fun _ -> EditSlide slide)
-                ] [
-                    i [clazz "edit icon"] []
                 ]
-            )*)
+            )
+        }
 
     body [] [
         require dependencies (
             Incremental.div 
-                (AttributeMap.ofList [ clazz "storyboard"; onSlideMove MoveSlide ]) (
+                (AttributeMap.ofList [ clazz "storyboard"; Events.onSlideMove MoveSlide ]) (
                     alist {
-                        let! story = model.story.Current
+                        for s in model.story.slides do
+                            yield! s |> mkCollapsingFrame model
+                            yield! s |> mkSlide model
 
-                        let cmp slide =
-                            match (story |> Story.trySelected) with
-                                | None -> false
-                                | Some s -> slide.id = s.id
-
-                        for s in (story |> Story.toList) do
-                            yield onBoot "initCollapsingFrame($('#__ID__'))" (
-                                let left = story |> Story.leftOf s 
-                                                 |> Option.map (Slide.id >> string)
-
-                                div [
-                                    yield clazz "collapsing preview frame"
-                                    yield attribute "right" (string s.id)
-                                    if left.IsSome then 
-                                        yield attribute "left" left.Value
-                                ] [ addSlideButton (Some s) ]
-                            )
-                            yield s |> mkSlide model (cmp s)
-
-                        yield onBoot "setupDropEvents($('#__ID__'))" (
-                            let left = story |> Story.last 
-                                             |> Option.map (Slide.id >> string)
-
-                            div [
-                                yield clazz "static preview frame"
-                                if left.IsSome then
-                                    yield attribute "left" left.Value
-                            ] [ yield addSlideButton None ]
-                        )
+                        yield! mkStaticFrame model
                     }
                 )
         )
@@ -341,44 +466,11 @@ let presentationView (model : MModel) =
         { kind = Stylesheet; name = "presentationStyle"; url = "Presentation.css" }
     ]
 
-    let callbackRemove = adaptive {
-        let! selected = model.story.Current |> Mod.map Story.trySelected
-
-        return selected |> Option.map (fun s ->
-            fun () -> RemoveSlide s
-        )
-    }
-
     require (dependencies) (
         body [clazz "ui"] [
             Html.SemUi.accordion "Rendering" "options" true [
                 model.appModel |> BoxSelectionApp.renderingControlsView |> UI.map AppAction
-            ]     
-
-            Html.SemUi.accordion "Slide" "film" true [
-
-                (* TODO: Probably don't need any of this *)
-                Incremental.div (AttributeMap.ofList [clazz "slide status"]) (
-                    alist {
-                        let! story = model.story.Current
-
-                        let txt = 
-                            match story |> Story.trySelected with
-                                | None ->
-                                    "No slide selected"
-                                | Some s -> 
-                                    let i = story |> Story.findIndex s
-                                    let n = story |> Story.length
-                                    sprintf "Slide %d/%d selected" (i + 1) n
-
-                        yield text txt
-                    }
-                )
-
-                Html.SemUi.button (Some "minus") "Remove"
-                                  (model.story.selected |> Mod.map Option.isSome)
-                                  callbackRemove
-            ]     
+            ]
         ]
     )
 
@@ -410,9 +502,7 @@ let view (model : MModel) =
 let app : App<Model,MModel,Action> =
     {
         unpersist = Unpersist.instance
-        threads = fun model -> model.appModel 
-                                    |> BoxSelectionApp.app.threads 
-                                    |> ThreadPool.map AppAction
+        threads = threads
         initial = initial
         update = update
         view = view

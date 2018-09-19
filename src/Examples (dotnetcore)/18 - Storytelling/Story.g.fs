@@ -116,9 +116,11 @@ module Mutable =
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Slide> = Aardvark.Base.Incremental.EqModRef<Story.Slide>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Slide>
         let _id = ResetMod.Create(__initial.id)
         let _content = ResetMod.Create(__initial.content)
+        let _thumbnail = ResetMod.Create(__initial.thumbnail)
         
         member x.id = _id :> IMod<_>
         member x.content = _content :> IMod<_>
+        member x.thumbnail = _thumbnail :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Story.Slide) =
@@ -127,6 +129,7 @@ module Mutable =
                 
                 ResetMod.Update(_id,v.id)
                 ResetMod.Update(_content,v.content)
+                ResetMod.Update(_thumbnail,v.thumbnail)
                 
         
         static member Create(__initial : Story.Slide) : MSlide = MSlide(__initial)
@@ -155,15 +158,21 @@ module Mutable =
                     override x.Set(r,v) = { r with content = v }
                     override x.Update(r,f) = { r with content = f r.content }
                 }
+            let thumbnail =
+                { new Lens<Story.Slide, Story.Thumbnail>() with
+                    override x.Get(r) = r.thumbnail
+                    override x.Set(r,v) = { r with thumbnail = v }
+                    override x.Update(r,f) = { r with thumbnail = f r.thumbnail }
+                }
     
     
     type MStory(__initial : Story.Story) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Story> = Aardvark.Base.Incremental.EqModRef<Story.Story>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Story>
-        let _slides = ResetMod.Create(__initial.slides)
+        let _slides = MList.Create(__initial.slides, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         let _selected = MOption.Create(__initial.selected, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         
-        member x.slides = _slides :> IMod<_>
+        member x.slides = _slides :> alist<_>
         member x.selected = _selected :> IMod<_>
         
         member x.Current = __current :> IMod<_>
@@ -171,7 +180,7 @@ module Mutable =
             if not (System.Object.ReferenceEquals(__current.Value, v)) then
                 __current.Value <- v
                 
-                ResetMod.Update(_slides,v.slides)
+                MList.Update(_slides, v.slides)
                 MOption.Update(_selected, v.selected)
                 
         
@@ -190,7 +199,7 @@ module Mutable =
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module Lens =
             let slides =
-                { new Lens<Story.Story, Aardvark.Base.ZList<Story.Slide>>() with
+                { new Lens<Story.Story, Aardvark.Base.plist<Story.Slide>>() with
                     override x.Get(r) = r.slides
                     override x.Set(r,v) = { r with slides = v }
                     override x.Update(r,f) = { r with slides = f r.slides }

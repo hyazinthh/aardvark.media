@@ -66,88 +66,90 @@ module Node =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Provenance =
 
-    let private checkMessage (msg : Reduced.Message) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-                if msg = Reduced.Unknown then
-                    Decided tree
-                else
-                    Undecided tree 
-        )
+    module private Rules =
 
-    let private checkStateChanged (state : Reduced.State) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-                if tree.Value.state = state then
-                    Decided tree
-                else
-                    Undecided tree 
-        )
+        let checkMessage (msg : Reduced.Message) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                    if msg = Reduced.Unknown then
+                        Decided tree
+                    else
+                        Undecided tree 
+            )
 
-    let private checkParent (state : Reduced.State) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-            match tree.Parent with
-                | Some p when (p.Value.state = state) ->
-                    Decided p
-                | _ ->
-                    Undecided tree
-        ) 
+        let checkStateChanged (state : Reduced.State) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                    if tree.Value.state = state then
+                        Decided tree
+                    else
+                        Undecided tree 
+            )
 
-    let private checkChildren (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-            let c =
-                tree |> ZTree.filterChildren (fun n ->
-                    (n.state = state) && (n.message = Some msg)
-                )
+        let checkParent (state : Reduced.State) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                match tree.Parent with
+                    | Some p when (p.Value.state = state) ->
+                        Decided p
+                    | _ ->
+                        Undecided tree
+            ) 
+
+        let checkChildren (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                let c =
+                    tree |> ZTree.filterChildren (fun n ->
+                        (n.state = state) && (n.message = Some msg)
+                    )
             
-            if List.length c > 1 then
-                Log.warn "Multiple identical children in provenance graph."
+                if List.length c > 1 then
+                    Log.warn "Multiple identical children in provenance graph."
 
-            match c with
-                | [] -> Undecided tree
-                | t::_ -> Decided t
-        ) 
+                match c with
+                    | [] -> Undecided tree
+                    | t::_ -> Decided t
+            ) 
 
-    let private coalesceWithCurrent (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-            let node = tree.Value
+        let coalesceWithCurrent (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                let node = tree.Value
 
-            let coal = 
-                node |> Node.message
-                     |> Option.map ((=) msg)
-                     |> Option.defaultValue false
-                     |> (&&) (not (prov.persistForStory node))
-                     |> (&&) (ZTree.isLeaf tree)                
+                let coal = 
+                    node |> Node.message
+                            |> Option.map ((=) msg)
+                            |> Option.defaultValue false
+                            |> (&&) (not (prov.persistForStory node))
+                            |> (&&) (ZTree.isLeaf tree)                
 
-            match coal with
-                | true ->
-                    let v = { node with state = state }
-                    Decided (tree |> ZTree.set v)
-                | false ->
-                    Undecided tree
-        )
+                match coal with
+                    | true ->
+                        let v = { node with state = state }
+                        Decided (tree |> ZTree.set v)
+                    | false ->
+                        Undecided tree
+            )
 
-    let private coalesceWithChild (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
-        input |> Decision.map (fun tree ->
-            let c =
-                tree |> ZTree.filterChildren (fun n ->
-                            (n.message = Some msg) && not (prov.persistForStory n)
-                     )
-                     |> List.filter ZTree.isLeaf
+        let coalesceWithChild (prov : Provenance) (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>) =
+            input |> Decision.map (fun tree ->
+                let c =
+                    tree |> ZTree.filterChildren (fun n ->
+                                (n.message = Some msg) && not (prov.persistForStory n)
+                            )
+                            |> List.filter ZTree.isLeaf
 
-            if List.length c > 1 then
-                Log.warn "Multiple leaf children to coalesce in provenance graph."
+                if List.length c > 1 then
+                    Log.warn "Multiple leaf children to coalesce in provenance graph."
 
-            match c with
-                | [] -> 
-                    Undecided tree
-                | t::_ ->
-                    let v = { t.Value with state = state }
-                    Decided (t |> ZTree.set v)
-        )
+                match c with
+                    | [] -> 
+                        Undecided tree
+                    | t::_ ->
+                        let v = { t.Value with state = state }
+                        Decided (t |> ZTree.set v)
+            )
 
-    let private appendNew (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>)=
-        input |> Decision.map (fun tree ->
-            tree |> ZTree.insert (Node.create state (Some msg)) |> Decided
-        )
+        let appendNew (state : Reduced.State) (msg : Reduced.Message) (input : Decision<Node ztree>)=
+            input |> Decision.map (fun tree ->
+                tree |> ZTree.insert (Node.create state (Some msg)) |> Decided
+            )
 
     let undo (prov : Provenance) =
         prov.tree
@@ -173,13 +175,13 @@ module Provenance =
 
         let t =
             Undecided prov.tree
-                |> checkMessage msg
-                |> checkStateChanged state
-                |> checkParent state
-                |> checkChildren state msg
-                |> coalesceWithCurrent prov state msg
-                |> coalesceWithChild prov state msg
-                |> appendNew state msg
+                |> Rules.checkMessage msg
+                |> Rules.checkStateChanged state
+                |> Rules.checkParent state
+                |> Rules.checkChildren state msg
+                |> Rules.coalesceWithCurrent prov state msg
+                |> Rules.coalesceWithChild prov state msg
+                |> Rules.appendNew state msg
                 |> Decision.get
 
         { prov with tree = t }

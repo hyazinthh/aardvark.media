@@ -1532,7 +1532,7 @@ module Server =
     open System.Runtime.CompilerServices
 
     [<AutoOpen>]
-    module private Utils = 
+    module Utils = 
         type ClientStatistics =
             {
                 session         : Guid

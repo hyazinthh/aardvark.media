@@ -25,6 +25,9 @@
     <EmbeddedResource Include="Provenance.css" />
     <EmbeddedResource Include="Provenance.js" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Lens.fs" />
+    <Compile Include="ThreadPool.fs" />
+    <Compile Include="PList.fs" />
     <Compile Include="BoxSelectionModel.fs" />
     <Compile Include="BoxSelectionApp.fs" />
     <Compile Include="AppModel.fs" />

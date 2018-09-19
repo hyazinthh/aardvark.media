@@ -13,13 +13,14 @@ type Action =
     | AppAction          of AppAction
     | UpdateConfig       of DockConfig
     | NodeClick          of NodeId
-    | SlideClick         of Slide
-    | RemoveSlide        of Slide
-    | EditSlide          of Slide
+    | SlideClick         of SlideId
+    | RemoveSlide        of SlideId
+    | EditSlide          of SlideId
     | MoveSlide          of SlideId * SlideId option * SlideId option
-    | AddFrameSlide      of Slide option
-    | AddTextSlide       of Slide option
+    | AddFrameSlide      of SlideId option
+    | AddTextSlide       of SlideId option
     | DeselectSlide
+    | ThumbnailUpdated   of Slide
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
 
@@ -30,6 +31,7 @@ type Model = {
     provenance : Provenance
     story : Story
     presentation : bool
+    thumbnailRequests : Slide hset
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -76,6 +78,5 @@ module Model =
     let getPresentation (model : Model) =
         model.appModel |> AppModel.getPresentation
 
-    let setStory (story : Story) (model : Model) =
-        { model with story = story
-                     provenance = model.provenance |> Story.Provenance.update story }
+    let getFrame (model : Model) =
+        FrameContent (model.provenance.tree.Value, model |> getPresentation)

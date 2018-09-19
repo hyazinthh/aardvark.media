@@ -119,7 +119,7 @@ function setupDragEvents(frame) {
 function setupDropEvents(frame) {
 	var storyboard = $('.storyboard');
 
-	// Expand frames when dragging over and valid target 
+	// Expand frames when dragging over a valid target 
 	frame.on('dragenter', function (ev) {
 		if (frame.hasClass('droppable')) {
 			frame.addClass('expanded');
@@ -154,4 +154,58 @@ function setupDropEvents(frame) {
 			aardvark.processEvent(storyboard.attr('id'), 'onslidemove', slide, left, right);
 		}
 	});
+}
+
+// Thumbnails
+var thumbnails = new Map();
+
+// From http://stackoverflow.com/questions/14967647/encode-decode-image-with-base64-breaks-image (2013-04-21)
+function toBinary (str) {
+	var bin = atob(str);
+	var length = bin.length;
+	var buf = new ArrayBuffer(length);
+	var arr = new Uint8Array(buf);
+	for (var i = 0; i < length; i++) {
+		arr[i] = bin.charCodeAt(i);
+	}
+	return buf;
+}
+
+function createNewBlob(id, data) {
+	var blob = new Blob([toBinary(data)], {type: 'image/jpg'});
+	var url = URL.createObjectURL(blob);
+	thumbnails.set(id, { url: url, data: data });
+
+	return url;
+}
+
+function setupThumbnail(frame, data) {
+
+	// Ignore if there is no data
+	if (data.length == 0) {
+		return;
+	}
+
+	// Try to get existing thumbnail for this slide
+	var id = frame.attr('slide');
+	var entry = thumbnails.get(id);
+
+	// Create new blob or reuse old URL
+	var url;
+
+	if (entry === undefined) {
+		url = createNewBlob(id, data);
+	} else {
+		if (entry.data === data) {
+			url = entry.url;
+		} else {
+			URL.revokeObjectURL(entry.url);
+			url = createNewBlob(id, data);	
+		}
+	}
+
+	// Add img element
+	var img = document.createElement("img");
+	img.src = url;
+	frame.prepend(img);
 }
