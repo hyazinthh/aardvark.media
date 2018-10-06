@@ -6,6 +6,8 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "18 - Storytelling", "Exampl
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "03 - LinePicking", "Scratch\03 - LinePicking\03 - LinePicking.fsproj", "{B7C449BE-F831-4492-9632-DF9B5C608C70}"
 EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "07 - UIUpdatePerformance", "Scratch\07 - UIUpdatePerformance\07 - UIUpdatePerformance.fsproj", "{16E1296F-4A35-4237-81B0-6450A065535E}"
+EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "18 - CameraControllerSettings", "Examples (dotnetcore)\18 - CameraControllerSettings\18 - CameraControllerSettings.fsproj", "{1AA14F14-3481-4B58-9BA0-44729938B189}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "06 - DrawRectsShader", "Scratch\06 - DrawRectsShader\06 - DrawRectsShader.fsproj", "{61B377A5-2522-49E1-B040-2D5F3D7EE4D8}"
@@ -87,6 +89,9 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "05 - CefExperiments", "Scratch\05 - CefExperiments\05 - CefExperiments.fsproj", "{6686FD79-4826-4566-B703-C3E797018715}"
 EndProject
 Global
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
@@ -100,6 +105,10 @@ Global
 		{B7C449BE-F831-4492-9632-DF9B5C608C70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B7C449BE-F831-4492-9632-DF9B5C608C70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B7C449BE-F831-4492-9632-DF9B5C608C70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16E1296F-4A35-4237-81B0-6450A065535E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16E1296F-4A35-4237-81B0-6450A065535E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16E1296F-4A35-4237-81B0-6450A065535E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16E1296F-4A35-4237-81B0-6450A065535E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1AA14F14-3481-4B58-9BA0-44729938B189}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1AA14F14-3481-4B58-9BA0-44729938B189}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1AA14F14-3481-4B58-9BA0-44729938B189}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -227,6 +236,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{D8E32690-9040-4176-83DF-C7F60D144327} = {DAC89FC7-17D3-467D-929D-781A88DA5324}
 		{B7C449BE-F831-4492-9632-DF9B5C608C70} = {6886C4F9-BA04-4E56-8687-672B6A9822DF}
+		{16E1296F-4A35-4237-81B0-6450A065535E} = {6886C4F9-BA04-4E56-8687-672B6A9822DF}
 		{1AA14F14-3481-4B58-9BA0-44729938B189} = {DAC89FC7-17D3-467D-929D-781A88DA5324}
 		{61B377A5-2522-49E1-B040-2D5F3D7EE4D8} = {6886C4F9-BA04-4E56-8687-672B6A9822DF}
 		{C4EBC4E9-48D2-429F-99AB-EFF991C80AFA} = {6886C4F9-BA04-4E56-8687-672B6A9822DF}
@@ -260,5 +270,11 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B7FCCF28-D562-4E8F-86A7-2310B38A1016}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal
