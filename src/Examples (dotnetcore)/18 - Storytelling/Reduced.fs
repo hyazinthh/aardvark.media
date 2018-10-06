@@ -85,6 +85,9 @@ module CameraView =
     let restore (v : CameraView) =
         OCameraView (v.sky, v.location, v.forward, v.up, v.right)
 
+    let equal (a : OCameraView) (b : OCameraView) =
+        (a |> create) = (b |> create)
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Message =
     

@@ -4,6 +4,7 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Application
 open Aardvark.UI.Primitives
+open Aardvark.UI.Animation
 
 open BoxSelection
 open Provenance
@@ -21,8 +22,15 @@ type Action =
     | AddTextSlide       of SlideId option
     | DeselectSlide
     | ThumbnailUpdated   of Slide
+    | AnimationAction    of AnimationAction
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
+
+[<DomainType>]
+type Animation = {
+    model : AnimationModel
+    savedView : CameraView
+}
 
 [<DomainType>]
 type Model = {
@@ -32,6 +40,7 @@ type Model = {
     story : Story
     presentation : bool
     thumbnailRequests : Slide hset
+    animation : Animation
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -80,3 +89,6 @@ module Model =
 
     let getFrame (model : Model) =
         FrameContent (model.provenance.tree.Value, model |> getPresentation)
+
+    let isAnimating (model : Model) =
+        model.animation.model |> AnimationApp.shouldAnimate

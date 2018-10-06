@@ -5,12 +5,14 @@ open System
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
+open Aardvark.Base.Rendering.Effects
 open Aardvark.SceneGraph
 
 open Aardvark.UI
 open Aardvark.UI.Primitives
 open Aardvark.UI.Trafos
 open BoxSelection
+open FShade
 
 
 let defaultBox =
@@ -168,18 +170,37 @@ let renderView (model : MBoxSelectionModel) =
         } 
         |> AList.toASet |> Sg.set
 
+    let floor =
+        let scaleTex (v : Vertex) =
+            vertex {
+                return { v with tc = v.tc * 10.0 }
+            }
+
+        Sg.quad
+            |> Sg.noEvents
+            |> Sg.scale 50.0
+            |> Sg.translate 0.0 0.0 -1.5
+            |> Sg.diffuseTexture DefaultTextures.checkerboard
+            |> Sg.shader {
+                do! scaleTex
+                do! DefaultSurfaces.trafo
+                do! DefaultSurfaces.diffuseTexture
+                do! DefaultSurfaces.simpleLighting
+            }
+
     let scene = 
         model.boxes 
             |> AMap.toASet 
             |> ASet.map (function (_, b) -> mkISg model b)
             |> Sg.set
-            |> Sg.effect [
-                toEffect DefaultSurfaces.trafo
-                toEffect DefaultSurfaces.vertexColor
-                toEffect DefaultSurfaces.simpleLighting                              
-                ]
+            |> Sg.shader {
+                do! DefaultSurfaces.trafo
+                do! DefaultSurfaces.vertexColor
+                do! DefaultSurfaces.simpleLighting
+            }
             |> Sg.fillMode model.rendering.fillMode
             |> Sg.cullMode model.rendering.cullMode
+            |> Sg.andAlso floor
             |> Sg.andAlso controllers        
 
     FreeFlyController.controlledControl model.camera CameraMessage frustum

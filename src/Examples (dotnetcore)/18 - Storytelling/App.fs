@@ -5,6 +5,7 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.UI
 open Aardvark.UI.Primitives
+open Aardvark.UI.Animation
 open Aardvark.Application
 open Aardvark.Service.Server
 
@@ -12,7 +13,52 @@ open Model
 open Provenance
 open Story
 
-module Model = 
+module Model =
+
+    module Animation =
+        // Removes all animations
+        let removeAll (model : Model) =
+            let l = Model.Lens.animation |. Animation.Lens.model |. AnimationModel.Lens.animations
+            model |> Lens.set l PList.empty
+
+        // Updates the animations
+        let update (msg : AnimationAction) (model : Model) =
+            let updateCamera (prev : Model) (model : Model) =
+
+                if Model.isAnimating model then
+                    model |> Model.setView model.animation.model.cam
+                else
+                    // TODO: We need to do this cause the animation system is buggy, see below
+                    if Model.isAnimating prev then
+                        model |> Model.setView model.animation.savedView
+                    else
+                        model
+
+            model |> Lens.set (Model.Lens.animation |. Animation.Lens.model) (msg |> AnimationApp.update model.animation.model)
+                  |> updateCamera model
+
+        // Sets the current view for the animations and saves the
+        // current / destination view. We need to save the final view since
+        // the animation system is buggy and does not actually return the final state.
+        // Instead it is set manually once the animation is finished.
+        let setView (view : CameraView) (model : Model) =
+            model |> Lens.set (Model.Lens.animation |. Animation.Lens.model |. AnimationModel.Lens.cam) view
+                  |> Lens.set (Model.Lens.animation |. Animation.Lens.savedView) (Model.getView model)
+
+    module Camera =
+        // Initializes a camera transition from src to dest
+        let animate (duration : RelativeTime) (src : Model) (dest : Model) =
+            let srcView = src |> Model.getView
+            let destView = dest |> Model.getView
+
+            if Reduced.CameraView.equal srcView destView then
+                dest
+            else
+                let animation = CameraAnimations.interpolate destView duration ""
+
+                dest |> Animation.setView srcView
+                     |> Animation.removeAll
+                     |> Animation.update (animation |> PushAnimation)
 
     module Provenance =
         // Updates the provenance unless the mapping returns None
@@ -30,8 +76,12 @@ module Model =
         let restore (model : Model) =
             { model with appModel = model.appModel |> Provenance.restore model.provenance }
 
-    module Story =
+        module Story =
+            // Updates the provenance with the story
+            let update (model : Model) =
+                model |> Lens.update Model.Lens.provenance (Story.Provenance.update model.story)
 
+    module Story =
         [<AutoOpen>]
         module private Helpers =
             // Updates the currently selected slide (if not None)
@@ -50,23 +100,23 @@ module Model =
                         | Some sel ->
                             s |> Story.saveChanges (sel |> updateSelected)
 
-                model.story |> updateStory
+                model |> Lens.update Model.Lens.story updateStory
 
         // Sets the story and updates the provenance
         // accordingly
         let update (f : Story -> Story) (model : Model) =
-            let story = model |> saveChanges |> f
-            
-            model |> Lens.set Model.Lens.story story
-                  |> Lens.set Model.Lens.provenance (model.provenance |> Story.Provenance.update story)
+            model |> if Model.isAnimating model then id else saveChanges
+                  |> Lens.update Model.Lens.story f
+                  |> Provenance.Story.update
 
         // Restores the model from the selected slide
-        let restore (model : Model) =
+        let restore (animate : bool) (model : Model) =
             match model.story |> Story.selected |> Slide.content with
                 | FrameContent (node, presentation) ->
                     model |> Model.setPresentation presentation
                           |> Provenance.update (Provenance.goto node)
                           |> Provenance.restore
+                          |> if animate then Camera.animate 0.5 model else id
                 | _ -> 
                     model
         
@@ -78,8 +128,6 @@ module Model =
         let removeThumbnailRequest (slide : Slide) (model : Model) =
             model |> Lens.update Model.Lens.thumbnailRequests (HSet.remove slide)
             
-
-
  module Events =
     // Fired when a node is clicked 
     let onNodeClick (cb : NodeId -> 'msg) =
@@ -142,11 +190,16 @@ let initial =
         story = Story.empty
         presentation = false
         thumbnailRequests = HSet.empty
+        animation = { model = { cam = model.camera.view; animation = Animate.On; animations = PList.empty }
+                      savedView = model.camera.view }
     }
 
 let update (model : Model) (act : Action) = 
     match act with
-        | AppAction a -> 
+        | AnimationAction a ->
+            model |> Model.Animation.update a
+
+        | AppAction a when not (Model.isAnimating model) ->
             let succ = BoxSelectionApp.update model.appModel a
             let prov = model.provenance |> Provenance.update succ a
             
@@ -190,12 +243,12 @@ let update (model : Model) (act : Action) =
         | KeyDown Keys.Right 
         | KeyDown Keys.Enter when model.story |> Story.isActive ->
             model |> Model.Story.update Story.forward
-                  |> Model.Story.restore
+                  |> Model.Story.restore true
 
         | KeyDown Keys.Left
         | KeyDown Keys.Back when model.story |> Story.isActive ->
             model |> Model.Story.update Story.backward
-                  |> Model.Story.restore
+                  |> Model.Story.restore true
 
         | NodeClick id ->
             model |> Model.Story.update (Story.select None)
@@ -204,7 +257,7 @@ let update (model : Model) (act : Action) =
 
         | SlideClick id ->
             model |> Model.Story.update (Story.selectById (Some id))
-                  |> Model.Story.restore
+                  |> Model.Story.restore true
 
         | DeselectSlide ->
             model |> Model.Story.update (Story.select None)
@@ -222,12 +275,15 @@ let update (model : Model) (act : Action) =
         | _ -> 
             model
 
-
 let threads (model : Model) =
     
     // Thread pool for actual application
     let appThreads = model.appModel |> BoxSelectionApp.app.threads 
                                     |> ThreadPool.map AppAction
+
+    // Thread pool for animations
+    let animationThreads = model.animation.model |> AnimationApp.ThreadPool.threads
+                                                 |> ThreadPool.map AnimationAction
 
     // Threads for creating thumbnails
     let thumbnailRequests =
@@ -271,10 +327,11 @@ let threads (model : Model) =
         // Only run if there is actually a frame selected
         model.story |> Story.trySelected
                     |> Option.filter Slide.isFrame
+                    |> Option.filter (fun _ -> model |> Model.isAnimating |> not)
                     |> Option.map spawn
                     |> Option.defaultValue ThreadPool.empty
 
-    [appThreads; thumbnailRequests; thumbnailUpdater]
+    [appThreads; animationThreads; thumbnailRequests; thumbnailUpdater]
         |> ThreadPool.unionMany
 
 

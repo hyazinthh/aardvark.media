@@ -52,7 +52,9 @@ module PListExtensions =
                 | Some v -> v
 
         let right (index : Index) (list : 'a plist) =
-            index |> Index.after |> list.TryGet
+            let (_, _, r) = list |> PList.toMap |> MapExt.neighbours index
+            r |> Option.map snd
 
         let left (index : Index) (list : 'a plist) =
-            index |> Index.before |> list.TryGet
+            let (l, _, _) = list |> PList.toMap |> MapExt.neighbours index
+            l |> Option.map snd
