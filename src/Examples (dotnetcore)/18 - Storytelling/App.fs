@@ -169,17 +169,17 @@ let initial =
                         content (
                             vertical 1.0 [
                                 horizontal 5.0 [
-                                    element { id "render"; title "Render View"; weight 3 }
+                                    element { id "render"; title "Render View"; isCloseable false; weight 3 }
 
                                     stack 1.0 (Some "controls") [
-                                        { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None }
-                                        { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None }
+                                        { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
+                                        { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
                                     ]
                                 ]
 
                                 stack 1.0 (Some "provenance") [
-                                    { id = "provenance"; title = Some "History"; weight = 1.0; deleteInvisible = None }
-                                    { id = "storyboard"; title = Some "Storyboard"; weight = 1.0; deleteInvisible = None }
+                                    { id = "provenance"; title = Some "History"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
+                                    { id = "storyboard"; title = Some "Storyboard"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
                                 ]
                             ]
                         )

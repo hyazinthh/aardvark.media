@@ -12,7 +12,8 @@
     <OutputPath>..\..\..\bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="resources\helper.js" />
+    <EmbeddedResource Include="resources\style.css" />
+    <EmbeddedResource Include="resources\force.js" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="App.fs" />
