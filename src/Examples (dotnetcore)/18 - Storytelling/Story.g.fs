@@ -10,61 +10,6 @@ module Mutable =
 
     
     
-    type MText(__initial : Story.Text) =
-        inherit obj()
-        let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Text> = Aardvark.Base.Incremental.EqModRef<Story.Text>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Text>
-        let _position = ResetMod.Create(__initial.position)
-        let _font = ResetMod.Create(__initial.font)
-        let _text = ResetMod.Create(__initial.text)
-        
-        member x.position = _position :> IMod<_>
-        member x.font = _font :> IMod<_>
-        member x.text = _text :> IMod<_>
-        
-        member x.Current = __current :> IMod<_>
-        member x.Update(v : Story.Text) =
-            if not (System.Object.ReferenceEquals(__current.Value, v)) then
-                __current.Value <- v
-                
-                ResetMod.Update(_position,v.position)
-                ResetMod.Update(_font,v.font)
-                ResetMod.Update(_text,v.text)
-                
-        
-        static member Create(__initial : Story.Text) : MText = MText(__initial)
-        static member Update(m : MText, v : Story.Text) = m.Update(v)
-        
-        override x.ToString() = __current.Value.ToString()
-        member x.AsString = sprintf "%A" __current.Value
-        interface IUpdatable<Story.Text> with
-            member x.Update v = x.Update v
-    
-    
-    
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module Text =
-        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-        module Lens =
-            let position =
-                { new Lens<Story.Text, Aardvark.Base.V2d>() with
-                    override x.Get(r) = r.position
-                    override x.Set(r,v) = { r with position = v }
-                    override x.Update(r,f) = { r with position = f r.position }
-                }
-            let font =
-                { new Lens<Story.Text, Aardvark.Rendering.Text.Font>() with
-                    override x.Get(r) = r.font
-                    override x.Set(r,v) = { r with font = v }
-                    override x.Update(r,f) = { r with font = f r.font }
-                }
-            let text =
-                { new Lens<Story.Text, System.String>() with
-                    override x.Get(r) = r.text
-                    override x.Set(r,v) = { r with text = v }
-                    override x.Update(r,f) = { r with text = f r.text }
-                }
-    
-    
     type MPresentationParams(__initial : Story.PresentationParams) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.PresentationParams> = Aardvark.Base.Incremental.EqModRef<Story.PresentationParams>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.PresentationParams>
@@ -109,17 +54,93 @@ module Mutable =
                     override x.Set(r,v) = { r with rendering = v }
                     override x.Update(r,f) = { r with rendering = f r.rendering }
                 }
+    [<AbstractClass; System.Runtime.CompilerServices.Extension; StructuredFormatDisplay("{AsString}")>]
+    type MContent() =
+        abstract member TryUpdate : Story.Content -> bool
+        abstract member AsString : string
+        
+        static member private CreateValue(__model : Story.Content) = 
+            match __model with
+                | TextContent -> MTextContent(__model) :> MContent
+                | FrameContent(item1, item2, item3) -> MFrameContent(__model, item1, item2, item3) :> MContent
+        
+        static member Create(v : Story.Content) =
+            ResetMod.Create(MContent.CreateValue v) :> IMod<_>
+        
+        [<System.Runtime.CompilerServices.Extension>]
+        static member Update(m : IMod<MContent>, v : Story.Content) =
+            let m = unbox<ResetMod<MContent>> m
+            if not (m.GetValue().TryUpdate v) then
+                m.Update(MContent.CreateValue v)
+    
+    and private MTextContent(__initial : Story.Content) =
+        inherit MContent()
+        
+        let mutable __current = __initial
+        
+        override x.ToString() = __current.ToString()
+        override x.AsString = sprintf "%A" __current
+        
+        override x.TryUpdate(__model : Story.Content) = 
+            if System.Object.ReferenceEquals(__current, __model) then
+                true
+            else
+                match __model with
+                    | TextContent -> 
+                        __current <- __model
+                        true
+                    | _ -> false
+    
+    and private MFrameContent(__initial : Story.Content, item1 : Provenance.Node, item2 : Story.PresentationParams, item3 : Annotations.Annotations) =
+        inherit MContent()
+        
+        let mutable __current = __initial
+        let _item1 = Provenance.Mutable.MNode.Create(item1)
+        let _item2 = MPresentationParams.Create(item2)
+        let _item3 = Annotations.Mutable.MAnnotations.Create(item3)
+        member x.item1 = _item1
+        member x.item2 = _item2
+        member x.item3 = _item3
+        
+        override x.ToString() = __current.ToString()
+        override x.AsString = sprintf "%A" __current
+        
+        override x.TryUpdate(__model : Story.Content) = 
+            if System.Object.ReferenceEquals(__current, __model) then
+                true
+            else
+                match __model with
+                    | FrameContent(item1,item2,item3) -> 
+                        __current <- __model
+                        Provenance.Mutable.MNode.Update(_item1, item1)
+                        MPresentationParams.Update(_item2, item2)
+                        Annotations.Mutable.MAnnotations.Update(_item3, item3)
+                        true
+                    | _ -> false
+    
+    
+    [<AutoOpen>]
+    module MContentPatterns =
+        let (|MTextContent|MFrameContent|) (m : MContent) =
+            match m with
+            | :? MTextContent as v -> MTextContent
+            | :? MFrameContent as v -> MFrameContent(v.item1,v.item2,v.item3)
+            | _ -> failwith "impossible"
+    
+    
+    
+    
     
     
     type MSlide(__initial : Story.Slide) =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Slide> = Aardvark.Base.Incremental.EqModRef<Story.Slide>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Slide>
         let _id = ResetMod.Create(__initial.id)
-        let _content = ResetMod.Create(__initial.content)
+        let _content = MContent.Create(__initial.content)
         let _thumbnail = ResetMod.Create(__initial.thumbnail)
         
         member x.id = _id :> IMod<_>
-        member x.content = _content :> IMod<_>
+        member x.content = _content
         member x.thumbnail = _thumbnail :> IMod<_>
         
         member x.Current = __current :> IMod<_>
@@ -128,7 +149,7 @@ module Mutable =
                 __current.Value <- v
                 
                 ResetMod.Update(_id,v.id)
-                ResetMod.Update(_content,v.content)
+                MContent.Update(_content, v.content)
                 ResetMod.Update(_thumbnail,v.thumbnail)
                 
         

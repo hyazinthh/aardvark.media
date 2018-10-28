@@ -18,6 +18,8 @@
     <ProjectReference Include="..\10 - Drawing3D\10 - Drawing3D.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Annotations.js" />
+    <EmbeddedResource Include="Annotations.css" />
     <EmbeddedResource Include="Overlay.css" />
     <EmbeddedResource Include="Presentation.css" />
     <EmbeddedResource Include="Storyboard.js" />
@@ -36,6 +38,7 @@
     <Compile Include="ZList.fs" />
     <Compile Include="Reduced.fs" />
     <Compile Include="Provenance.fs" />
+    <Compile Include="Annotations.fs" />
     <Compile Include="Story.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="App.fs" />

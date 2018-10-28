@@ -58,3 +58,8 @@ module PListExtensions =
         let left (index : Index) (list : 'a plist) =
             let (l, _, _) = list |> PList.toMap |> MapExt.neighbours index
             l |> Option.map snd
+
+        let get (index : Index) (list : 'a plist) =
+            match PList.tryGet index list with
+                | None -> raise (KeyNotFoundException ())
+                | Some x -> x

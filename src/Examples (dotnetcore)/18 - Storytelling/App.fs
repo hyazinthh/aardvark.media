@@ -4,6 +4,7 @@ open System.Net
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.UI
+open Aardvark.UI.Generic
 open Aardvark.UI.Primitives
 open Aardvark.UI.Animation
 open Aardvark.Application
@@ -12,8 +13,23 @@ open Aardvark.Service.Server
 open Model
 open Provenance
 open Story
+open Annotations
 
 module Model =
+
+    module Annotations =
+        // Updates the annotations
+        let update (msg : AnnotationAction) (model : Model) =
+            let sel = Option.get model.story.selected
+
+            let content =
+                match sel.content with
+                    | FrameContent (n, p, a) -> 
+                        FrameContent (n, p, a |> Annotations.update msg)               
+                    | x -> x
+
+            let sel = { sel with content = content }
+            model |> Lens.update Model.Lens.story (Story.set sel sel)
 
     module Animation =
         // Removes all animations
@@ -91,8 +107,10 @@ module Model =
                 let updateSelected (sel : Slide) =
                     match sel.content with
                         | TextContent _ -> sel
-                        | FrameContent _ ->
-                            Slide.Lens.content.Set (sel, model |> Model.getFrame)
+                        | FrameContent (_, _, a) ->
+                            let n = model.provenance.tree.Value
+                            let p = Model.getPresentation model
+                            sel |> Lens.set Slide.Lens.content (FrameContent (n, p, a))
 
                 let updateStory (s : Story) =
                     match s.selected with
@@ -112,7 +130,7 @@ module Model =
         // Restores the model from the selected slide
         let restore (animate : bool) (model : Model) =
             match model.story |> Story.selected |> Slide.content with
-                | FrameContent (node, presentation) ->
+                | FrameContent (node, presentation, _) ->
                     model |> Model.setPresentation presentation
                           |> Provenance.update (Provenance.goto node)
                           |> Provenance.restore
@@ -121,12 +139,12 @@ module Model =
                     model
         
         // Requests a thumbnail for the given slide
-        let requestThumbnail (slide : Slide) (model : Model) =
-            model |> Lens.update Model.Lens.thumbnailRequests (HSet.add slide)
+        let requestThumbnail (id : SlideId) (model : Model) =
+            model |> Lens.update Model.Lens.thumbnailRequests (HSet.add id)
 
         // Remove a thumbnail request
-        let removeThumbnailRequest (slide : Slide) (model : Model) =
-            model |> Lens.update Model.Lens.thumbnailRequests (HSet.remove slide)
+        let removeThumbnailRequest (id : SlideId) (model : Model) =
+            model |> Lens.update Model.Lens.thumbnailRequests (HSet.remove id)
             
  module Events =
     // Fired when a node is clicked 
@@ -199,6 +217,9 @@ let update (model : Model) (act : Action) =
         | AnimationAction a ->
             model |> Model.Animation.update a
 
+        | AnnotationAction a ->
+            model |> Model.Annotations.update a
+
         | AppAction a when not (Model.isAnimating model) ->
             let succ = BoxSelectionApp.update model.appModel a
             let prov = model.provenance |> Provenance.update succ a
@@ -217,7 +238,7 @@ let update (model : Model) (act : Action) =
                     | Some id -> Story.insertBeforeById slide id
 
             model |> Model.Story.update story
-                  |> Model.Story.requestThumbnail slide
+                  |> Model.Story.requestThumbnail slide.id
 
         | RemoveSlide id ->
             model |> Model.Story.update (Story.removeById id)
@@ -262,12 +283,15 @@ let update (model : Model) (act : Action) =
         | DeselectSlide ->
             model |> Model.Story.update (Story.select None)
 
-        | ThumbnailUpdated slide ->
-            if model.story |> Story.contains slide then
-                model |> Model.Story.update (Story.set slide slide)
-            else
-                model
-            |> Model.Story.removeThumbnailRequest slide
+        | ThumbnailUpdated (id, t) ->
+            let slide = model.story |> Story.tryFindById id
+
+            match slide with
+                | Some s -> 
+                    model |> Model.Story.update (Story.set s { s with thumbnail = t })
+                | None -> 
+                    model
+            |> Model.Story.removeThumbnailRequest id
 
         | UpdateConfig cfg ->
             { model with dockConfig = cfg }
@@ -288,17 +312,15 @@ let threads (model : Model) =
     // Threads for creating thumbnails
     let thumbnailRequests =
 
-        let thumbnailProc slide =
+        let thumbnailProc (id : SlideId) =
             proclist {
                 do! Async.SwitchToNewThread ()
-                yield ThumbnailUpdated { 
-                    slide with thumbnail = Thumbnail.create ()
-                }
+                yield ThumbnailUpdated (id, Thumbnail.create ())
             }
 
         model.thumbnailRequests
-            |> HSet.fold (fun p s ->
-                p |> ThreadPool.add (string s.id) (thumbnailProc s)
+            |> HSet.fold (fun p id ->
+                p |> ThreadPool.add (string id) (thumbnailProc id)
             ) ThreadPool.empty
 
     // Thread for keeping the thumbnail of the selected
@@ -308,9 +330,7 @@ let threads (model : Model) =
         let updateProc (selected : Slide) =
             let rec proc () =
                 proclist {
-                    yield ThumbnailUpdated {
-                        selected with thumbnail = Thumbnail.create ()
-                    }
+                    yield ThumbnailUpdated (selected.id, Thumbnail.create ())
 
                     do! Async.Sleep 1000
                     yield! proc ()
@@ -336,29 +356,128 @@ let threads (model : Model) =
 
 
 let renderView (model : MModel) =
+    let overlay (a : MAnnotations) =
+        Incremental.div (AttributeMap.ofList [clazz "frame"]) (
+            alist {
+                yield i [clazz "huge camera icon"] []
+                yield i [
+                    clazz "huge remove link icon"
+                    onClick (fun _ -> DeselectSlide)
+                ] []
+
+                let! focus = a.focus |> Mod.map Option.isSome
+                let! hidden = a.show |> Mod.map not
+
+                yield div [clazz "annotation menu"] [
+                    div [
+                        clazz ("ui icon toggle button" + if hidden then "" else " active")
+                        onClick (fun _ -> Toggle |> AnnotationAction)
+                    ] [
+                        i [clazz "comments icon"] []
+                    ]
+
+                    div [
+                        yield clazz "ui vertical buttons"
+                        if hidden then
+                            yield style "display: none"
+                    ] [
+                        div [clazz ("ui icon button" + if focus then "" else " disabled")] [
+                            i [clazz "font icon"] []
+                        ]
+                        div [clazz ("ui icon button" + if focus then "" else " disabled")] [
+                            i [clazz "flag icon"] []
+                        ]
+                        div [
+                            clazz "ui icon button"
+                            onClick (fun _ -> Add |> AnnotationAction)
+                        ] [
+                            i [clazz "add icon"] []
+                        ]
+                    ]
+
+                ]
+            }
+        )
+
+    let mkAnnotation (a : MAnnotation) =
+
+        let setData = "widthData.onmessage = function (data) { setWidth($('#__ID__'), data); };" +
+                      "positionData.onmessage = function (data) { setPosition($('#__ID__'), data); };"
+
+        onBoot "initLabel($('#__ID__'))" (
+            onBoot' [ "widthData", a.label.width |> Mod.channel
+                      "positionData", a.label.position |> Mod.channel ] setData (
+                let atts = amap {
+                    let! id = a.id
+     
+                    yield clazz "label"
+                    yield onLabelMoved (fun p -> (id, p) |> LabelMoved |> AnnotationAction)
+                    yield onLabelResized (fun w -> (id, w) |> LabelResized |> AnnotationAction)
+                }
+            
+                Incremental.div (AttributeMap.ofAMap atts) (
+                    alist {
+                        let! id = a.id
+
+                        yield div [clazz "grabber"] []
+
+                        yield div [clazz "ui icon move button"] [
+                            i [clazz "move icon"] []
+                        ]
+
+                        yield div [
+                            clazz "ui icon remove button"
+                            onClick (fun _ -> id |> Remove |> AnnotationAction)
+                        ] [
+                            i [clazz "remove icon"] []
+                        ]
+
+                        yield textarea [
+                            attribute "rows" "1"
+                            attribute "placeholder" "Add text here..."
+                            onChange (fun s -> (id, s) |> LabelChanged |> AnnotationAction)
+                            onFocus (fun _ -> id |> Focus |> AnnotationAction)
+                            onBlur (fun _ -> Blur |> AnnotationAction)
+                        ] a.label.text
+                    }
+                )
+            )
+        )
+        
+
     let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "overlayStyle"; url = "Overlay.css" }
+        { kind = Stylesheet; name = "annotationsStyle"; url = "Annotations.css" }
+        { kind = Script; name = "annotationsScript"; url = "Annotations.js" }
     ]
 
-    body [ onKeyDown KeyDown; onKeyUp KeyUp ] [
+    // TODO: Adding keyboard events here breaks input events
+    // for the text areas of the annotations
+    body [ (*onKeyDown KeyDown; onKeyUp KeyUp*) ] [
         model.appModel
             |> BoxSelectionApp.renderView
             |> UI.map AppAction
 
         require (dependencies) (
-            Incremental.div (AttributeMap.ofList [ clazz "render overlay"]) (
-                alist {
-                    let! active = model.story.selected |> Mod.map Option.isSome
+            Annotations.init (
+                Incremental.div (AttributeMap.ofList [ clazz "render overlay"]) (
+                    alist {
+                        let! selected = model.story.selected
 
-                    if active then
-                        yield div [clazz "frame"] [
-                            i [clazz "huge camera icon"] []
-                            i [
-                                clazz "huge remove link icon"
-                                onClick (fun _ -> DeselectSlide)
-                            ] []
-                        ]
-                }
+                        if selected.IsSome then
+                            let! cont = selected.Value.content
+
+                            match cont with
+                                | MFrameContent (_, _, annotations) ->
+                                    let! show = annotations.show
+
+                                    if show then
+                                        yield! annotations.list |> AList.map mkAnnotation
+
+                                    yield overlay annotations
+                                | _ -> ()
+                    }
+                )
             )
         )
     ]
@@ -388,7 +507,7 @@ let provenanceView (model : MModel) =
 
     body [ Events.onNodeClick NodeClick ] [
         require dependencies (
-            onBoot "initChart();" (
+            onBoot "initChart()" (
                 onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
                     Svg.svg [ clazz "rootSvg"; style "width:100%; height:100%" ] []
                 )

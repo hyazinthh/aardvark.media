@@ -64,7 +64,7 @@ module Mutable =
         let _provenance = Provenance.Mutable.MProvenance.Create(__initial.provenance)
         let _story = Story.Mutable.MStory.Create(__initial.story)
         let _presentation = ResetMod.Create(__initial.presentation)
-        let _thumbnailRequests = MSet.Create(unbox, __initial.thumbnailRequests, (fun v -> Story.Mutable.MSlide.Create(v)), (fun (m,v) -> Story.Mutable.MSlide.Update(m, v)), (fun v -> v))
+        let _thumbnailRequests = MSet.Create(__initial.thumbnailRequests)
         let _animation = MAnimation.Create(__initial.animation)
         
         member x.appModel = _appModel
@@ -134,7 +134,7 @@ module Mutable =
                     override x.Update(r,f) = { r with presentation = f r.presentation }
                 }
             let thumbnailRequests =
-                { new Lens<Model.Model, Aardvark.Base.hset<Story.Slide>>() with
+                { new Lens<Model.Model, Aardvark.Base.hset<Story.SlideId>>() with
                     override x.Get(r) = r.thumbnailRequests
                     override x.Set(r,v) = { r with thumbnailRequests = v }
                     override x.Update(r,f) = { r with thumbnailRequests = f r.thumbnailRequests }

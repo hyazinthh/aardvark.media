@@ -3,18 +3,11 @@ namespace Story
 open System
 open System.Collections.Generic
 open Aardvark.Base
-open Aardvark.Rendering.Text
 open Aardvark.Base.Incremental
 
 open Model
 open Provenance
-
-[<DomainType>]
-type Text = {
-    position : V2d
-    font : Font
-    text : string
-}
+open Annotations
 
 // Record containing parameters that influence
 // the rendering of frame slides
@@ -26,9 +19,10 @@ type PresentationParams = {
 
 // A slide can either contain raw text
 // or a frame referencing an analysis state from the provenance graph
+[<DomainType>]
 type Content =
-    | TextContent of List<Text>
-    | FrameContent of Node * PresentationParams
+    | TextContent
+    | FrameContent of Node * PresentationParams * Annotations
 
     static member isText = function
         | TextContent _ -> true
@@ -76,10 +70,12 @@ type Thumbnail =
 
 // The slide record
 [<DomainType>]
-type Slide =
-    { id : SlideId
-      content : Content 
-      thumbnail : Thumbnail }
+type Slide = {
+    [<PrimaryKey>]
+    id : SlideId
+    content : Content 
+    thumbnail : Thumbnail 
+}
 
  // A story is a list of slides and optionally
  // a currently selected slide
@@ -94,7 +90,7 @@ module Slide =
 
     let frame (provenance : Provenance) (presentation : PresentationParams) (thumbnail : Thumbnail) =
         { id = SlideId.generate ()
-          content = FrameContent (provenance.tree.Value, presentation)
+          content = FrameContent (provenance.tree.Value, presentation, Annotations.empty)
           thumbnail = thumbnail }
 
     let id (slide : Slide) = slide.id
@@ -246,7 +242,7 @@ module Story =
             s.slides |> PList.tryFind (fun x ->
                 match x.content with
                     | TextContent _ -> false
-                    | FrameContent (n, _) -> (n.id = node.id) && (s.selected <> Some x)
+                    | FrameContent (n, _, _) -> (n.id = node.id) && (s.selected <> Some x)
             ) |> Option.isSome
 
         let update (s : Story) (provenance : Provenance) =

@@ -9,9 +9,11 @@ open Aardvark.UI.Animation
 open BoxSelection
 open Provenance
 open Story
+open Annotations
 
 type Action =
     | AppAction          of AppAction
+    | AnnotationAction   of AnnotationAction
     | UpdateConfig       of DockConfig
     | NodeClick          of NodeId
     | SlideClick         of SlideId
@@ -21,7 +23,7 @@ type Action =
     | AddFrameSlide      of SlideId option
     | AddTextSlide       of SlideId option
     | DeselectSlide
-    | ThumbnailUpdated   of Slide
+    | ThumbnailUpdated   of SlideId * Thumbnail
     | AnimationAction    of AnimationAction
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
@@ -39,7 +41,7 @@ type Model = {
     provenance : Provenance
     story : Story
     presentation : bool
-    thumbnailRequests : Slide hset
+    thumbnailRequests : SlideId hset
     animation : Animation
 }
 
@@ -86,9 +88,6 @@ module Model =
 
     let getPresentation (model : Model) =
         model.appModel |> AppModel.getPresentation
-
-    let getFrame (model : Model) =
-        FrameContent (model.provenance.tree.Value, model |> getPresentation)
 
     let isAnimating (model : Model) =
         model.animation.model |> AnimationApp.shouldAnimate
