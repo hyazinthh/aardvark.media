@@ -125,11 +125,9 @@ module Mutable =
         let mutable __current : Aardvark.Base.Incremental.IModRef<Annotations.Annotations> = Aardvark.Base.Incremental.EqModRef<Annotations.Annotations>(__initial) :> Aardvark.Base.Incremental.IModRef<Annotations.Annotations>
         let _list = MList.Create(__initial.list, (fun v -> MAnnotation.Create(v)), (fun (m,v) -> MAnnotation.Update(m, v)), (fun v -> v))
         let _focus = MOption.Create(__initial.focus, (fun v -> MAnnotation.Create(v)), (fun (m,v) -> MAnnotation.Update(m, v)), (fun v -> v))
-        let _show = ResetMod.Create(__initial.show)
         
         member x.list = _list :> alist<_>
         member x.focus = _focus :> IMod<_>
-        member x.show = _show :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Annotations.Annotations) =
@@ -138,7 +136,6 @@ module Mutable =
                 
                 MList.Update(_list, v.list)
                 MOption.Update(_focus, v.focus)
-                ResetMod.Update(_show,v.show)
                 
         
         static member Create(__initial : Annotations.Annotations) : MAnnotations = MAnnotations(__initial)
@@ -166,10 +163,4 @@ module Mutable =
                     override x.Get(r) = r.focus
                     override x.Set(r,v) = { r with focus = v }
                     override x.Update(r,f) = { r with focus = f r.focus }
-                }
-            let show =
-                { new Lens<Annotations.Annotations, System.Boolean>() with
-                    override x.Get(r) = r.show
-                    override x.Set(r,v) = { r with show = v }
-                    override x.Update(r,f) = { r with show = f r.show }
                 }

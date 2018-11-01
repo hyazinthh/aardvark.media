@@ -4,7 +4,6 @@ open System.Net
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.UI
-open Aardvark.UI.Generic
 open Aardvark.UI.Primitives
 open Aardvark.UI.Animation
 open Aardvark.Application
@@ -25,7 +24,7 @@ module Model =
             let content =
                 match sel.content with
                     | FrameContent (n, p, a) -> 
-                        FrameContent (n, p, a |> Annotations.update msg)               
+                        FrameContent (n, p, a |> AnnotationApp.update msg)               
                     | x -> x
 
             let sel = { sel with content = content }
@@ -145,7 +144,8 @@ module Model =
         // Remove a thumbnail request
         let removeThumbnailRequest (id : SlideId) (model : Model) =
             model |> Lens.update Model.Lens.thumbnailRequests (HSet.remove id)
-            
+   
+ [<AutoOpen>]
  module Events =
     // Fired when a node is clicked 
     let onNodeClick (cb : NodeId -> 'msg) =
@@ -187,18 +187,16 @@ let initial =
                         content (
                             vertical 1.0 [
                                 horizontal 5.0 [
-                                    element { id "render"; title "Render View"; isCloseable false; weight 3 }
+                                    element { id "render"; title "Render View"; isCloseable false; weight 10 }
 
-                                    stack 1.0 (Some "controls") [
+                                    stack 3.5 (Some "controls") [
                                         { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
                                         { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
                                     ]
                                 ]
 
-                                stack 1.0 (Some "provenance") [
-                                    { id = "provenance"; title = Some "History"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
-                                    { id = "storyboard"; title = Some "Storyboard"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
-                                ]
+                                element { id "provenance"; title "History"; isCloseable true; weight 1 }
+                                element { id "storyboard"; title "Storyboard"; isCloseable true; weight 1.25 }
                             ]
                         )
                         appName "Box Selection"
@@ -293,6 +291,10 @@ let update (model : Model) (act : Action) =
                     model
             |> Model.Story.removeThumbnailRequest id
 
+        | ToggleAnnotations ->
+            let l = Model.Lens.story |. Story.Lens.showAnnotations
+            model |> Lens.update l (fun s -> not s)
+
         | UpdateConfig cfg ->
             { model with dockConfig = cfg }
 
@@ -366,12 +368,12 @@ let renderView (model : MModel) =
                 ] []
 
                 let! focus = a.focus |> Mod.map Option.isSome
-                let! hidden = a.show |> Mod.map not
+                let! hidden = model.story.showAnnotations |> Mod.map not
 
                 yield div [clazz "annotation menu"] [
                     div [
                         clazz ("ui icon toggle button" + if hidden then "" else " active")
-                        onClick (fun _ -> Toggle |> AnnotationAction)
+                        onClick (fun _ -> ToggleAnnotations)
                     ] [
                         i [clazz "comments icon"] []
                     ]
@@ -399,56 +401,8 @@ let renderView (model : MModel) =
             }
         )
 
-    let mkAnnotation (a : MAnnotation) =
-
-        let setData = "widthData.onmessage = function (data) { setWidth($('#__ID__'), data); };" +
-                      "positionData.onmessage = function (data) { setPosition($('#__ID__'), data); };"
-
-        onBoot "initLabel($('#__ID__'))" (
-            onBoot' [ "widthData", a.label.width |> Mod.channel
-                      "positionData", a.label.position |> Mod.channel ] setData (
-                let atts = amap {
-                    let! id = a.id
-     
-                    yield clazz "label"
-                    yield onLabelMoved (fun p -> (id, p) |> LabelMoved |> AnnotationAction)
-                    yield onLabelResized (fun w -> (id, w) |> LabelResized |> AnnotationAction)
-                }
-            
-                Incremental.div (AttributeMap.ofAMap atts) (
-                    alist {
-                        let! id = a.id
-
-                        yield div [clazz "grabber"] []
-
-                        yield div [clazz "ui icon move button"] [
-                            i [clazz "move icon"] []
-                        ]
-
-                        yield div [
-                            clazz "ui icon remove button"
-                            onClick (fun _ -> id |> Remove |> AnnotationAction)
-                        ] [
-                            i [clazz "remove icon"] []
-                        ]
-
-                        yield textarea [
-                            attribute "rows" "1"
-                            attribute "placeholder" "Add text here..."
-                            onChange (fun s -> (id, s) |> LabelChanged |> AnnotationAction)
-                            onFocus (fun _ -> id |> Focus |> AnnotationAction)
-                            onBlur (fun _ -> Blur |> AnnotationAction)
-                        ] a.label.text
-                    }
-                )
-            )
-        )
-        
-
     let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "overlayStyle"; url = "Overlay.css" }
-        { kind = Stylesheet; name = "annotationsStyle"; url = "Annotations.css" }
-        { kind = Script; name = "annotationsScript"; url = "Annotations.js" }
     ]
 
     // TODO: Adding keyboard events here breaks input events
@@ -459,26 +413,23 @@ let renderView (model : MModel) =
             |> UI.map AppAction
 
         require (dependencies) (
-            Annotations.init (
-                Incremental.div (AttributeMap.ofList [ clazz "render overlay"]) (
-                    alist {
-                        let! selected = model.story.selected
+            Incremental.div (AttributeMap.ofList [clazz "render overlay"]) <| alist {
+                let! selected = model.story.selected
 
-                        if selected.IsSome then
-                            let! cont = selected.Value.content
+                if selected.IsSome then
+                    let! cont = selected.Value.content
 
-                            match cont with
-                                | MFrameContent (_, _, annotations) ->
-                                    let! show = annotations.show
+                    match cont with
+                        | MFrameContent (_, _, annotations) ->
+                            let! show = model.story.showAnnotations
 
-                                    if show then
-                                        yield! annotations.list |> AList.map mkAnnotation
+                            if show then
+                                yield annotations |> AnnotationApp.view false
+                                                    |> UI.map AnnotationAction
 
-                                    yield overlay annotations
-                                | _ -> ()
-                    }
-                )
-            )
+                            yield overlay annotations
+                        | _ -> ()
+            }
         )
     ]
 
@@ -505,7 +456,7 @@ let provenanceView (model : MModel) =
 
     let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
 
-    body [ Events.onNodeClick NodeClick ] [
+    body [ onNodeClick NodeClick ] [
         require dependencies (
             onBoot "initChart()" (
                 onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
@@ -541,103 +492,119 @@ let storyboardView (model : MModel) =
         )   
 
     let mkCollapsingFrame (model : MModel) (slide : MSlide) =
-        alist {
-            let! id = slide.id
+        // TODO: Optimize! This depends on the whole story record!
+        let prev = Mod.map2 (fun story slide ->
+                        story |> Story.leftOf slide |> Option.map (Slide.id >> string)
+                   ) model.story.Current slide.Current
 
-            // TODO: Optimize! This depends on the whole story record!
-            let! slide = slide.Current
-            let! prev = model.story.Current |> Mod.map (fun s ->
-                            s |> Story.leftOf slide |> Option.map (Slide.id >> string)
-                        )
+        onBoot "initCollapsingFrame($('#__ID__'))" (
+            Incremental.div (AttributeMap.ofAMap <| amap {
+                yield clazz "collapsing preview frame"
 
-            yield onBoot "initCollapsingFrame($('#__ID__'))" (
-                div [
-                    yield clazz "collapsing preview frame"
-                    yield attribute "right" (string id)
-                    if prev.IsSome then 
-                        yield attribute "left" prev.Value
-                ] [ addSlideButton (Some id) ]
-            )
-        }
+                let! id = slide.id
+                yield attribute "right" (string id)
+
+                let! prev = prev
+                if prev.IsSome then 
+                    yield attribute "left" prev.Value 
+                    
+            }) <| alist {
+                let! id = slide.id
+                yield addSlideButton (Some id)
+            }
+        )
 
     let mkStaticFrame (model : MModel) =
-        alist {
-            // TODO: Optimize! This depends on the whole story record!
-            let! last = model.story.Current |> Mod.map (fun s ->
-                            s |> Story.last |> Option.map (Slide.id >> string)
-                        )
+        // TODO: Optimize! This depends on the whole story record!
+        let last = model.story.Current |> Mod.map (fun s ->
+                        s |> Story.last |> Option.map (Slide.id >> string)
+                   )    
 
-            yield onBoot "setupDropEvents($('#__ID__'))" (
-                div [
-                    yield clazz "static preview frame"
-                    if last.IsSome then
-                        yield attribute "left" last.Value
-                ] [ yield addSlideButton None ]
-            )
-        }
-        
+        onBoot "setupDropEvents($('#__ID__'))" (
+            Incremental.div (AttributeMap.ofAMap <| amap {
+                yield clazz "static preview frame"
 
-    let mkSlide (model : MModel) (slide : MSlide)  =
-        alist {
-            let! id = slide.id
-            let! thumbnail = slide.thumbnail
+                let! last = last
+                if last.IsSome then
+                    yield attribute "left" last.Value
 
-            // TODO: Optimize! This depends on the whole story record!
-            let! slide = slide.Current
-            let! index = model.story.Current |> Mod.map (Story.findIndex slide)
-
-            let! selected = adaptive {
-                let! sel = model.story.selected
-
-                match sel with
-                    | None -> return false
-                    | Some x -> return! x.id |> Mod.map ((=) id)
-            }
-
-            let atts = [
-                clazz ("frame" + if selected then " selected" else "")
-                attribute "slide" (string id)
-                onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SlideClick id))
+            }) <| AList.ofList [
+                yield addSlideButton None
             ]
+        )
+        
+    let mkSlide (model : MModel) (slide : MSlide)  =
+        onBoot "setupDragEvents($('#__ID__'))" (
+            Incremental.div (AttributeMap.ofAMap <| amap {
+                let! id = slide.id
 
-            let boot = "setupDragEvents($('#__ID__')); " +
-                       (sprintf "setupThumbnail($('#__ID__'), '%A')" thumbnail)
+                let! selected = adaptive {
+                    let! sel = model.story.selected
 
-            yield onBoot boot (
-                div atts [
-                    yield onBoot "disableClickPropagation($('#__ID__'))" (
-                        div [
-                            clazz "ui icon remove slide button"
-                            onClick (fun _ -> RemoveSlide id)
-                        ] [
-                            i [clazz "remove icon"] []
-                        ]
+                    match sel with
+                        | None -> return false
+                        | Some x -> return! x.id |> Mod.map ((=) id)
+                }
+
+                yield clazz ("frame" + if selected then " selected" else "")
+                yield attribute "slide" (string id)
+                yield onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SlideClick id))
+
+            }) <| AList.ofList [
+                Incremental.div (AttributeMap.ofList [clazz "thumbnail"]) <| alist {
+                    let updateThumb = "thumbData.onmessage = function (data) { setupThumbnail($('#__ID__'), data); };"
+                    let thumbChannel = slide.thumbnail |> Mod.map string
+                                                        |> Mod.channel
+
+                    yield onBoot' ["thumbData", thumbChannel] updateThumb (
+                        img []
                     )
 
-                    yield div [clazz "ui floating blue label"] [
-                        text (string (index + 1))
+                    let! content = slide.content
+
+                    match content with
+                        | MFrameContent (_, _, annotations) ->
+                            yield annotations |> AnnotationApp.view true
+                                                |> UI.map AnnotationAction
+                        | _ -> ()
+                }
+            
+                onBoot "disableClickPropagation($('#__ID__'))" (
+                    Incremental.div (AttributeMap.ofAMap <| amap {
+                        let! id = slide.id
+                        yield clazz "ui icon remove slide button"
+                        yield onClick (fun _ -> RemoveSlide id)
+
+                    }) <| AList.ofList [
+                        i [clazz "remove icon"] []
                     ]
-                ]
-            )
-        }
+                )
+
+                Incremental.div (AttributeMap.ofList [clazz "ui floating blue label"]) <| alist {
+                    // TODO: Optimize! This depends on the whole story record!
+                    let! s = slide.Current
+                    let! index = model.story.Current |> Mod.map (Story.findIndex s)
+                    yield text (string (index + 1))
+                }
+            ]
+        )
 
     body [] [
         require dependencies (
-            Incremental.div 
-                (AttributeMap.ofList [ clazz "storyboard"; Events.onSlideMove MoveSlide ]) (
-                    alist {
-                        for s in model.story.slides do
-                            yield! s |> mkCollapsingFrame model
-                            yield! s |> mkSlide model
+            Incremental.div (AttributeMap.ofList [ 
+                clazz "storyboard"
+                onSlideMove MoveSlide 
+            ]) <| alist {
+                for s in model.story.slides do
+                    yield s |> mkCollapsingFrame model
+                    yield s |> mkSlide model
 
-                        yield! mkStaticFrame model
-                    }
-                )
+                yield mkStaticFrame model
+            }
         )
     ]
 
 let presentationView (model : MModel) =
-
     let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "presentationStyle"; url = "Presentation.css" }
     ]

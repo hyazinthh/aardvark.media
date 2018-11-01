@@ -179,7 +179,8 @@ function createNewBlob(id, data) {
 	return url;
 }
 
-function setupThumbnail(frame, data) {
+function setupThumbnail(img, data) {
+	var frame = img.parent().parent();
 
 	// Ignore if there is no data
 	if (data.length == 0) {
@@ -205,7 +206,9 @@ function setupThumbnail(frame, data) {
 	}
 
 	// Add img element
-	var img = document.createElement("img");
-	img.src = url;
-	frame.prepend(img);
+	img.attr('src', url);
+	img.on('load', function () {
+		img.parent().width(img.width())
+					.height(img.height());
+	});
 }

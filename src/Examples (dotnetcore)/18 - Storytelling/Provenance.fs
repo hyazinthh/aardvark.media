@@ -29,6 +29,7 @@ type NodeId =
 
 [<DomainType>]
 type Node = {
+    [<PrimaryKey>]
     id : NodeId
     state : Reduced.State
     message : Option<Reduced.Message>

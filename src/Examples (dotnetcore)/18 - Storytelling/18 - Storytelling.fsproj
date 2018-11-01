@@ -38,7 +38,8 @@
     <Compile Include="ZList.fs" />
     <Compile Include="Reduced.fs" />
     <Compile Include="Provenance.fs" />
-    <Compile Include="Annotations.fs" />
+    <Compile Include="AnnotationModel.fs" />
+    <Compile Include="AnnotationApp.fs" />
     <Compile Include="Story.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="App.fs" />

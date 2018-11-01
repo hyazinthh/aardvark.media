@@ -34,7 +34,7 @@
     background-color: rgb(55, 57, 61)
 }
 
-.storyboard .frame .label {
+.storyboard .frame > .label {
     padding: 2px;
     padding-left: 10px;
     padding-right: 10px;
@@ -43,7 +43,14 @@
     margin: 10px !important;
 }
 
-.storyboard .frame img {
+.storyboard .frame > .thumbnail {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.storyboard .frame > .thumbnail img {
     max-width: 100%;
     max-height: 100%;
     display: block;
@@ -56,13 +63,15 @@
 }
 
 .storyboard .frame:not(.static):not(.selected):hover {
-    cursor: pointer;
     box-shadow: 0 0 2px 1px rgba(50, 203, 253, 0.863);
 }
 
 .storyboard .frame.selected {
-    cursor: pointer;
     box-shadow: 0 0 2px 1px rgba(190, 243, 45, 0.822);
+}
+
+.storyboard .frame:not(.static) * {
+    cursor: pointer;
 }
 
 .storyboard .frame .slide.button {
@@ -71,22 +80,18 @@
     opacity: 0.5;
 }
 
-.storyboard .frame .remove.button {
+.storyboard .frame > .remove.button {
     padding: 5px;
     margin: 5px;
     right: 0;
     top: 0;
 }
 
-.storyboard .frame .slide.button:hover {
+.storyboard .frame > .slide.button:hover {
     opacity: 1.0;
 }
 
-.storyboard .frame:hover .remove.button {
-    display: inline-block;
-}
-
-.storyboard .selected.frame:hover .edit.button {
+.storyboard .frame:hover > .remove.button {
     display: inline-block;
 }
 
@@ -111,26 +116,26 @@
     max-width: 150px;
 }
 
-.storyboard .add.button {
+.storyboard .frame > .add.button {
     opacity: 0.5
 }
 
-.storyboard .frame:hover .add.button {
+.storyboard .frame:hover > .add.button {
     opacity: 1.0;
 }
 
-.storyboard .droppable.preview.frame .add.button {
+.storyboard .droppable.preview.frame > .add.button {
     display: none;
 }
 
-.storyboard .collapsing.preview.frame .add.button { 
+.storyboard .collapsing.preview.frame > .add.button { 
     display: none;
 }
 
-.storyboard:not(.dragging) .expanded.collapsing.preview.frame .add.button { 
+.storyboard:not(.dragging) .expanded.collapsing.preview.frame > .add.button { 
     display: block;
 }
 
-.storyboard .add.button .second {
+.storyboard .frame > .add.button > .second {
     display: none;
 }

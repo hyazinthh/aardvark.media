@@ -83,6 +83,7 @@ type Slide = {
 type Story = {
     slides : Slide plist
     selected : Slide option
+    showAnnotations : bool
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -90,7 +91,7 @@ module Slide =
 
     let frame (provenance : Provenance) (presentation : PresentationParams) (thumbnail : Thumbnail) =
         { id = SlideId.generate ()
-          content = FrameContent (provenance.tree.Value, presentation, Annotations.empty)
+          content = FrameContent (provenance.tree.Value, presentation, AnnotationApp.init)
           thumbnail = thumbnail }
 
     let id (slide : Slide) = slide.id
@@ -115,6 +116,7 @@ module Story =
     let empty = {
         slides = PList.empty
         selected = None
+        showAnnotations = false
     }
 
     let isActive (s : Story) =

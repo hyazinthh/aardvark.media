@@ -24,6 +24,7 @@ type Action =
     | AddTextSlide       of SlideId option
     | DeselectSlide
     | ThumbnailUpdated   of SlideId * Thumbnail
+    | ToggleAnnotations
     | AnimationAction    of AnimationAction
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys

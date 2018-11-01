@@ -7,16 +7,18 @@ function point(x, y) {
     return { 'X': x, 'Y': y };
 }
 
-function getScale() {
-    var cont = $('.render.overlay');
-    return Math.min(cont.width() / baseWidth, cont.height() / baseHeight);
+function getScale(elem) {
+    var cont = elem.parent();
+    return point(cont.width() / baseWidth, cont.height() / baseHeight);
 }
 
 function transform(elem) {
     var pos = elem.data('pos');
+    var scale = getScale(elem);
+    var globalScale = Math.min(scale.X, scale.Y);
 
     elem.css({
-        'transform': `scale(${getScale()}) translate(${pos.X}px, ${pos.Y}px)`
+        'transform': `translate(${pos.X * scale.X}px, ${pos.Y * scale.Y}px) scale(${globalScale})`
     });    
 }
 
@@ -26,6 +28,14 @@ function autosize(elem) {
         .height(function() {
             return `${this.scrollHeight}px`;
         });
+}
+
+function setText(elem, text) {
+    elem.children('textarea')
+        .empty()
+        .append(text);
+        
+    autosize(elem);
 }
 
 function setWidth(elem, width) {
@@ -39,13 +49,13 @@ function setPosition(elem, pos) {
 }
 
 function setTop(elem) {
-    $('.top.label').each(function () {
+    $('.annotations .top.label').each(function () {
         $(this).removeClass('top');
     });
     elem.addClass('top');
 }
 
-// Initializes the annotation for the Javascript
+// Initializes the label for the Javascript
 // side (dragging, resizing, ...)
 function initLabel (elem) {
     elem.on('mouseenter', function() { if (drag.elem === null) elem.addClass('hovered'); })
@@ -73,10 +83,10 @@ function resizeLabel(ev) {
     if (resize.elem == null) {
         return;
     }
-    var scale = getScale();
+    var scale = getScale(resize.elem);
 
     var curr = ev.clientX;
-    var delta = (curr - resize.prev) / scale;
+    var delta = (curr - resize.prev) / scale.X;
     resize.prev = curr;
 
     var w = resize.elem.width();
@@ -99,10 +109,10 @@ function dragLabel(ev) {
         return;
     }
 
-    var scale = getScale();
+    var scale = getScale(drag.elem);
 
     var curr = point(ev.clientX, ev.clientY);
-    var delta = point((curr.X - drag.prev.X) / scale, (curr.Y - drag.prev.Y) / scale);
+    var delta = point((curr.X - drag.prev.X) / scale.X, (curr.Y - drag.prev.Y) / scale.Y);
     drag.prev = curr;
 
     var pos = drag.elem.data('pos');
@@ -132,7 +142,7 @@ document.addEventListener('mouseup', function() {
 });
 
 window.addEventListener('resize', function() {
-    $('.label').each(function() { 
+    $('.annotations .label').each(function() {
         transform($(this)); 
     });
 });
