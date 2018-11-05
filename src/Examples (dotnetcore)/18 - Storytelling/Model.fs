@@ -9,31 +9,17 @@ open Aardvark.UI.Animation
 open BoxSelection
 open Provenance
 open Story
-open Annotations
+open Animation
 
 type Action =
     | AppAction          of AppAction
-    | AnnotationAction   of AnnotationAction
+    | ProvenanceAction   of ProvenanceAction
+    | StoryAction        of StoryAction
     | UpdateConfig       of DockConfig
     | NodeClick          of NodeId
-    | SlideClick         of SlideId
-    | RemoveSlide        of SlideId
-    | EditSlide          of SlideId
-    | MoveSlide          of SlideId * SlideId option * SlideId option
-    | AddFrameSlide      of SlideId option
-    | AddTextSlide       of SlideId option
-    | DeselectSlide
-    | ThumbnailUpdated   of SlideId * Thumbnail
-    | ToggleAnnotations
     | AnimationAction    of AnimationAction
     | KeyDown            of key : Keys
     | KeyUp              of key : Keys
-
-[<DomainType>]
-type Animation = {
-    model : AnimationModel
-    savedView : CameraView
-}
 
 [<DomainType>]
 type Model = {
@@ -42,7 +28,6 @@ type Model = {
     provenance : Provenance
     story : Story
     presentation : bool
-    thumbnailRequests : SlideId hset
     animation : Animation
 }
 

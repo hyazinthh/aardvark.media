@@ -5,16 +5,16 @@ var padding = 15;
 var gapLevel = 75;
 
 function initChart() {
-    rootSvg = document.getElementsByClassName("rootSvg")[0];
+    rootSvg = document.getElementsByClassName('rootSvg')[0];
     svgContainer = rootSvg.parentElement;
 
-    chart = d3.select(".rootSvg");
-    linkLayer = chart.append("g");
-    nodeLayer = chart.append("g");
+    chart = d3.select('.rootSvg');
+    linkLayer = chart.append('g');
+    nodeLayer = chart.append('g');
 
     tree = d3.tree();
 
-    window.addEventListener("resize", redraw);
+    window.addEventListener('resize', redraw);
 }
 
 function getX(x) {
@@ -30,29 +30,29 @@ function getWidth(x) {
 }
 
 function diagonal(d) {
-    return "M" + getX(d.x) + "," + getY(d.y)
-         + "C" + getX((d.x + d.parent.x) / 2) + "," + getY(d.y)
-         + " " + getX((d.x + d.parent.x) / 2) + "," + getY(d.parent.y)
-         + " " + getX(d.parent.x) + "," + getY(d.parent.y);
+    return 'M' + getX(d.x) + ',' + getY(d.y)
+         + 'C' + getX((d.x + d.parent.x) / 2) + ',' + getY(d.y)
+         + ' ' + getX((d.x + d.parent.x) / 2) + ',' + getY(d.parent.y)
+         + ' ' + getX(d.parent.x) + ',' + getY(d.parent.y);
 }
 
 function diagonalInit(d) {
     var p = getPreviousPos(d.parent);
 
-    return "M" + getX(p.x) + "," + getY(p.y)
-         + "C" + getX(p.x) + "," + getY(p.y)
-         + " " + getX(p.x) + "," + getY(p.y)
-         + " " + getX(p.x) + "," + getY(p.y);
+    return 'M' + getX(p.x) + ',' + getY(p.y)
+         + 'C' + getX(p.x) + ',' + getY(p.y)
+         + ' ' + getX(p.x) + ',' + getY(p.y)
+         + ' ' + getX(p.x) + ',' + getY(p.y);
 }
 
 function translate(d) {
-    return "translate(" + getX(d.x) + "," + getY(d.y) + ")";
+    return `translate(${getX(d.x)}, ${getY(d.y)})`;
 }
 
 function translateInit(d) {
     if (d.parent !== null) {
         var p = getPreviousPos(d.parent);
-        return "translate(" + getX(p.x) + "," + getY(p.y) + ")";
+        return `translate(${getX(p.x)}, ${getY(p.y)})`;
     } else {
         return translate(d);
     }
@@ -63,11 +63,11 @@ function key(node) {
 }
 
 function fill(d) {
-    return (d.data.id === json.current) ? "palegreen" : "#fff";
+    return (d.data.id === json.current) ? 'palegreen' : '#fff';
 }
 
 function radius(d) {
-    return (d.data.id === json.current) ? "10" : "8";
+    return (d.data.id === json.current) ? '10' : '8';
 }
 
 function getPreviousPos(d) {
@@ -101,7 +101,7 @@ function update(data) {
     try {
         json = JSON.parse(data);
     } catch (err) {
-        console.error(err.message + ": '" + data + "'");
+        console.error(`${err.message}: '${data}'`);
         return;
     }
 
@@ -114,7 +114,7 @@ function update(data) {
     root.descendants().forEach(function (d) {
         d.y = d.x;
         d.x = d.depth * gapLevel;
-        rootSvg.style.width = getWidth(d.x) + "px";
+        rootSvg.style.width = getWidth(d.x) + 'px';
     });
 
     // Draw tree
@@ -130,63 +130,63 @@ function redraw() {
     }
 
     // Update, add and remove links
-    var link = linkLayer.selectAll(".link")
+    var link = linkLayer.selectAll('.link')
         .data(root.descendants().slice(1), key)
 
     var linkEnter =
         link.enter()
-            .append("path")
-                .attr("class", "link")
-                .attr("d", diagonalInit);
+            .append('path')
+                .attr('class', 'link')
+                .attr('d', diagonalInit);
 
     linkEnter.transition()
-        .attr("d", diagonal);
+        .attr('d', diagonal);
 
     link.exit().remove();
 
     link.transition()
-        .attr("d", diagonal);
+        .attr('d', diagonal);
 
     // Update, add and remove nodes
-    var node = nodeLayer.selectAll(".node")
+    var node = nodeLayer.selectAll('.node')
         .data(root.descendants(), key)
 
     var nodeEnter =
         node.enter()
-            .append("g")
-                .attr("class", "node")
-                .attr("transform", translateInit)
-                .on("click", click)
+            .append('g')
+                .attr('class', 'node')
+                .attr('transform', translateInit)
+                .on('click', click)
 
     nodeEnter
-        .append("circle")
-            .attr("r", radius)
-            .attr("fill", fill);
+        .append('circle')
+            .attr('r', radius)
+            .attr('fill', fill);
 
     nodeEnter
-        .append("text")
-            .attr("text-anchor", "middle")
-            .attr("dominant-baseline", "central")
+        .append('text')
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'central')
             .text(function (d) {
                 return d.data.msg;
         });
 
     nodeEnter.transition()
-        .attr("transform", translate);
+        .attr('transform', translate);
 
     node.exit().remove();
 
     node.transition()
-        .attr("transform", translate);
+        .attr('transform', translate);
 
-    node.selectAll("circle")
+    node.selectAll('circle')
         .transition()
             .ease(d3.easeElastic.amplitude(2))
             .duration(1000)
-                .attr("r", radius)
-                .attr("fill", fill);
+                .attr('r', radius)
+                .attr('fill', fill);
 }
 
 function click(d) {
-    aardvark.processEvent(document.body.id, 'onnodeclick', d.data.id);
+    aardvark.processEvent($('.provenanceView').attr('id'), 'onnodeclick', d.data.id);
 }

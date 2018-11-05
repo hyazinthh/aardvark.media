@@ -69,10 +69,8 @@ module Mutable =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Provenance.Provenance> = Aardvark.Base.Incremental.EqModRef<Provenance.Provenance>(__initial) :> Aardvark.Base.Incremental.IModRef<Provenance.Provenance>
         let _tree = ResetMod.Create(__initial.tree)
-        let _persistForStory = ResetMod.Create(__initial.persistForStory)
         
         member x.tree = _tree :> IMod<_>
-        member x.persistForStory = _persistForStory :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Provenance.Provenance) =
@@ -80,7 +78,6 @@ module Mutable =
                 __current.Value <- v
                 
                 ResetMod.Update(_tree,v.tree)
-                ResetMod.Update(_persistForStory,v.persistForStory)
                 
         
         static member Create(__initial : Provenance.Provenance) : MProvenance = MProvenance(__initial)
@@ -102,10 +99,4 @@ module Mutable =
                     override x.Get(r) = r.tree
                     override x.Set(r,v) = { r with tree = v }
                     override x.Update(r,f) = { r with tree = f r.tree }
-                }
-            let persistForStory =
-                { new Lens<Provenance.Provenance, Provenance.Node -> System.Boolean>() with
-                    override x.Get(r) = r.persistForStory
-                    override x.Set(r,v) = { r with persistForStory = v }
-                    override x.Update(r,f) = { r with persistForStory = f r.persistForStory }
                 }

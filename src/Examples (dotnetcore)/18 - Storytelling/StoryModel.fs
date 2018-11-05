@@ -84,14 +84,28 @@ type Story = {
     slides : Slide plist
     selected : Slide option
     showAnnotations : bool
+    thumbnailRequests : SlideId hset
 }
+
+type StoryAction =
+    | AnnotationAction   of AnnotationAction
+    | Forward
+    | Backward
+    | SelectSlide        of SlideId
+    | RemoveSlide        of SlideId
+    | MoveSlide          of SlideId * SlideId option * SlideId option
+    | AddFrameSlide      of SlideId option
+    | AddTextSlide       of SlideId option
+    | DeselectSlide
+    | ThumbnailUpdated   of SlideId * Thumbnail
+    | ToggleAnnotations
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Slide =
 
     let frame (provenance : Provenance) (presentation : PresentationParams) (thumbnail : Thumbnail) =
         { id = SlideId.generate ()
-          content = FrameContent (provenance.tree.Value, presentation, AnnotationApp.init)
+          content = FrameContent (Provenance.current provenance, presentation, AnnotationApp.init)
           thumbnail = thumbnail }
 
     let id (slide : Slide) = slide.id
@@ -112,12 +126,6 @@ module Story =
 
         let findInList (slide : Slide) (s : Story) =
             s.slides |> PList.findIndex (fun s -> s.id = slide.id)
-
-    let empty = {
-        slides = PList.empty
-        selected = None
-        showAnnotations = false
-    }
 
     let isActive (s : Story) =
         Option.isSome s.selected
@@ -238,14 +246,9 @@ module Story =
         { s with slides = s.slides |> PList.set (s |> findInList s.selected.Value) modified 
                  selected = Some modified }
 
-    module Provenance =
-
-        let persistNode (s : Story) (node : Node) =
-            s.slides |> PList.tryFind (fun x ->
-                match x.content with
-                    | TextContent _ -> false
-                    | FrameContent (n, _, _) -> (n.id = node.id) && (s.selected <> Some x)
-            ) |> Option.isSome
-
-        let update (s : Story) (provenance : Provenance) =
-            provenance |> Provenance.setPersistForStory (persistNode s)
+    let isNodeReferenced (node : Node) (s : Story) =
+        s.slides |> PList.tryFind (fun x ->
+            match x.content with
+                | TextContent _ -> false
+                | FrameContent (n, _, _) -> (n.id = node.id) && (s.selected <> Some x)
+        ) |> Option.isSome

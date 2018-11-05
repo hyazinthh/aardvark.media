@@ -193,10 +193,12 @@ module Mutable =
         let _slides = MList.Create(__initial.slides, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         let _selected = MOption.Create(__initial.selected, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         let _showAnnotations = ResetMod.Create(__initial.showAnnotations)
+        let _thumbnailRequests = MSet.Create(__initial.thumbnailRequests)
         
         member x.slides = _slides :> alist<_>
         member x.selected = _selected :> IMod<_>
         member x.showAnnotations = _showAnnotations :> IMod<_>
+        member x.thumbnailRequests = _thumbnailRequests :> aset<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Story.Story) =
@@ -206,6 +208,7 @@ module Mutable =
                 MList.Update(_slides, v.slides)
                 MOption.Update(_selected, v.selected)
                 ResetMod.Update(_showAnnotations,v.showAnnotations)
+                MSet.Update(_thumbnailRequests, v.thumbnailRequests)
                 
         
         static member Create(__initial : Story.Story) : MStory = MStory(__initial)
@@ -239,4 +242,10 @@ module Mutable =
                     override x.Get(r) = r.showAnnotations
                     override x.Set(r,v) = { r with showAnnotations = v }
                     override x.Update(r,f) = { r with showAnnotations = f r.showAnnotations }
+                }
+            let thumbnailRequests =
+                { new Lens<Story.Story, Aardvark.Base.hset<Story.SlideId>>() with
+                    override x.Get(r) = r.thumbnailRequests
+                    override x.Set(r,v) = { r with thumbnailRequests = v }
+                    override x.Update(r,f) = { r with thumbnailRequests = f r.thumbnailRequests }
                 }
