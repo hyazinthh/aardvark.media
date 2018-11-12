@@ -10,6 +10,11 @@ open Model
 open Provenance
 open Story
 
+[<AutoOpen>]
+module private Events =
+    let onResize (cb : V2i -> 'msg) =
+        onEvent "onresize" ["{ X: $(document).width(), Y: $(document).height() }"] (List.head >> Pickler.json.UnPickleOfString >> cb)
+
 let initial =
     let model = BoxSelectionApp.initial in {
         appModel = model
@@ -36,6 +41,7 @@ let initial =
         story = StoryApp.init
         presentation = false
         animation = AnimationApp.init model
+        renderControlSize = V2i.One
     }
 
 let update (model : Model) (act : Action) = 
@@ -80,6 +86,9 @@ let update (model : Model) (act : Action) =
         | KeyDown Keys.Back ->
             model |> StoryApp.update Backward
 
+        | RenderControlResized s ->
+            { model with renderControlSize = s }
+
         | UpdateConfig cfg ->
             { model with dockConfig = cfg }
 
@@ -106,14 +115,16 @@ let threads (model : Model) =
 let renderView (model : MModel) =
     // TODO: Adding keyboard events here breaks input events
     // for the text areas of the annotations
-    body [ (*onKeyDown KeyDown; onKeyUp KeyUp*) ] [
-        model.appModel
-            |> BoxSelectionApp.renderView
-            |> UI.map AppAction
+    onBoot "$(document).trigger('resize')" (
+        body [ onResize RenderControlResized (*onKeyDown KeyDown; onKeyUp KeyUp*) ] [
+            model.appModel
+                |> BoxSelectionApp.renderView
+                |> UI.map AppAction
 
-        model |> StoryApp.overlayView
-              |> UI.map StoryAction
-    ]
+            model |> StoryApp.overlayView
+                  |> UI.map StoryAction
+        ]
+    )
 
 let controlsView (model : MModel) =
     body [style "background-color:#1B1C1E"] [

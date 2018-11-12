@@ -25,6 +25,7 @@ type BoxSelectionAction =
     | AddBox
     | RemoveBox
     | ClearSelection
+    | MouseMoved       of V3d
 
 [<DomainType>]
 type VisibleBox = {
@@ -38,7 +39,8 @@ type VisibleBox = {
 
 [<DomainType>]
 type BoxSelectionModel = {
-    camera : CameraControllerState    
+    camera : CameraControllerState
+    frustum : Frustum
     rendering : RenderingParameters
 
     boxes : hmap<BoxId,VisibleBox>
@@ -49,4 +51,6 @@ type BoxSelectionModel = {
     trafoMode : TrafoMode
 
     nextColor : ColorIndex
+
+    sceneHit : V3d
 }

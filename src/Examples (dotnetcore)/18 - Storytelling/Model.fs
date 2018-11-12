@@ -12,14 +12,15 @@ open Story
 open Animation
 
 type Action =
-    | AppAction          of AppAction
-    | ProvenanceAction   of ProvenanceAction
-    | StoryAction        of StoryAction
-    | UpdateConfig       of DockConfig
-    | NodeClick          of NodeId
-    | AnimationAction    of AnimationAction
-    | KeyDown            of key : Keys
-    | KeyUp              of key : Keys
+    | AppAction             of AppAction
+    | ProvenanceAction      of ProvenanceAction
+    | StoryAction           of StoryAction
+    | UpdateConfig          of DockConfig
+    | NodeClick             of NodeId
+    | AnimationAction       of AnimationAction
+    | KeyDown               of Keys
+    | KeyUp                 of Keys
+    | RenderControlResized  of V2i
 
 [<DomainType>]
 type Model = {
@@ -29,6 +30,7 @@ type Model = {
     story : Story
     presentation : bool
     animation : Animation
+    renderControlSize : V2i
 }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

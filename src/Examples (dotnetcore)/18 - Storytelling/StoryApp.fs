@@ -67,6 +67,22 @@ module private Helpers =
             | _ -> 
                 model
 
+    let getViewProjTrafo (model : MModel) =
+        let cfg = RenderControlConfig.standard
+
+        adaptive {
+            let! s = model.renderControlSize
+            let! f = model.appModel.frustum
+            let! v = model.appModel.camera.view
+
+            return f |> cfg.adjustAspect s
+                     |> Camera.create v
+                     |> Camera.viewProjTrafo
+        }
+
+    let getSceneHit (model : MModel) =
+        model.appModel.sceneHit
+
  [<AutoOpen>]
  module private Events =
     // Fired when a slide is dragged and dropped
@@ -147,66 +163,92 @@ let threads (model : Model) =
     ThumbnailApp.threads model
 
 let overlayView (model : MModel) =
+
+    // We don't want buttons to take away the focus from
+    // the textareas of the labels
+    let preventBlur (x : DomNode<'a>) =
+        onBoot "$('#__ID__').on('mousedown', function (event) { event.preventDefault(); });" x
+
     let overlay (a : MAnnotations) =
-        Incremental.div (AttributeMap.ofList [clazz "frame"]) (
-            alist {
-                yield i [clazz "huge camera icon"] []
-                yield i [
-                    clazz "huge remove link icon"
-                    onClick (fun _ -> DeselectSlide)
-                ] []
+        let focus = a.focus |> Mod.map Option.isSome
 
-                let! focus = a.focus |> Mod.map Option.isSome
-                let! hidden = model.story.showAnnotations |> Mod.map not
+        div [clazz "frame"] [
+            i [clazz "huge camera icon"] []
+            i [
+                clazz "huge remove link icon"
+                onClick (fun _ -> DeselectSlide)
+            ] []
 
-                yield div [clazz "annotation menu"] [
-                    div [
+            Incremental.div (AttributeMap.ofList [clazz "annotation menu"]) <|
+                alist {
+                    let! hidden = model.story.showAnnotations |> Mod.map not
+
+                    yield div [
                         clazz ("ui icon toggle button" + if hidden then "" else " active")
                         onClick (fun _ -> ToggleAnnotations)
                     ] [
                         i [clazz "comments icon"] []
                     ]
 
-                    div [
-                        yield clazz "ui vertical buttons"
-                        if hidden then
-                            yield style "display: none"
-                    ] [
-                        div [clazz ("ui icon button" + if focus then "" else " disabled")] [
-                            i [clazz "font icon"] []
-                        ]
-                        div [clazz ("ui icon button" + if focus then "" else " disabled")] [
-                            i [clazz "flag icon"] []
-                        ]
-                        div [
-                            clazz "ui icon button"
-                            onClick (fun _ -> Add |> AnnotationAction)
-                        ] [
-                            i [clazz "add icon"] []
-                        ]
-                    ]
+                    if not hidden then
+                        yield div [ clazz "ui vertical buttons" ] [
+                            preventBlur (
+                                Incremental.div (AttributeMap.ofAMap <| amap {
+                                    let! focus = focus
+                                    yield clazz <| "ui icon button" + if focus then "" else " disabled"
+                                }) <| AList.ofList [
+                                    i [clazz "font icon"] []
+                                ]
+                            )
 
-                ]
-            }
-        )
+                            preventBlur (
+                                Incremental.div (AttributeMap.ofAMap <| amap {
+                                    let! focus = focus
+                                    let! targeting = a.targeting
+
+                                    yield clazz <| "ui icon button" +
+                                                   (if focus then "" else " disabled") +
+                                                   (if targeting then " active" else "")
+
+                                    yield onClick (fun _ -> Target |> AnnotationAction)
+                                }) <| AList.ofList [
+                                    i [clazz "flag icon"] []
+                                ]
+                            )
+
+                            preventBlur (
+                                div [
+                                    clazz "ui icon button"
+                                    onClick (fun _ -> Add |> AnnotationAction)
+                                ] [
+                                    i [clazz "add icon"] []
+                                ]
+                            )
+                        ]
+                }
+        ]
 
     let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "overlayStyle"; url = "Overlay.css" }
     ]
 
     require (dependencies) (
-        Incremental.div (AttributeMap.ofList [clazz "render overlay"]) <| alist {
+        Incremental.div (AttributeMap.ofList [
+            clazz "render overlay"
+        ]) <| alist {
             let! selected = model.story.selected
+            let! show = model.story.showAnnotations
 
             if selected.IsSome then
                 let! cont = selected.Value.content
 
                 match cont with
                     | MFrameContent (_, _, annotations) ->
-                        let! show = model.story.showAnnotations
-
                         if show then
-                            yield annotations |> AnnotationApp.view false
+                            let vp = getViewProjTrafo model
+                            let sceneHit = getSceneHit model
+
+                            yield annotations |> AnnotationApp.view vp sceneHit false
                                               |> UI.map AnnotationAction
 
                         yield overlay annotations
@@ -312,7 +354,10 @@ let storyboardView (model : MModel) =
 
                     match content with
                         | MFrameContent (_, _, annotations) ->
-                            yield annotations |> AnnotationApp.view true
+                            let vp = getViewProjTrafo model
+                            let sceneHit = getSceneHit model
+
+                            yield annotations |> AnnotationApp.view vp sceneHit true
                                               |> UI.map AnnotationAction
                         | _ -> ()
                 }

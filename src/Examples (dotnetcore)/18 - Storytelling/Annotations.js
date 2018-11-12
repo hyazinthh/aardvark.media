@@ -7,11 +7,26 @@ function point(x, y) {
     return { 'X': x, 'Y': y };
 }
 
+// Computes the scale of an element based on the current size
+// of the container and the base size
 function getScale(elem) {
-    var cont = elem.parent();
+    var cont = elem.parents('.annotations');
     return point(cont.width() / baseWidth, cont.height() / baseHeight);
 }
 
+// Gets the corresponding arrow of a label
+function getArrow(label) {
+    return label.parents('.annotation')
+                .find('.arrow');
+}
+
+// Gets the corresponding label of an arrow
+function getLabel(arrow) {
+    return arrow.parents('.annotation')
+                .find('.label');    
+}
+
+// Transforms the given label based on its scale and position
 function transform(elem) {
     var pos = elem.data('pos');
     var scale = getScale(elem);
@@ -22,14 +37,22 @@ function transform(elem) {
     });    
 }
 
+// Adjusts the height of the given label based on its
+// textarea
 function autosize(elem) {
     elem.children('textarea')
 		.height('auto')
         .height(function() {
             return `${this.scrollHeight}px`;
         });
+
+    var arrow = getArrow(elem);
+    //if (arrow.length > 0) {
+        setArrowOrigin(arrow);
+    //}     
 }
 
+// Sets the text of the given label
 function setText(elem, text) {
     elem.children('textarea')
         .empty()
@@ -38,21 +61,119 @@ function setText(elem, text) {
     autosize(elem);
 }
 
+// Sets the width of the given label
 function setWidth(elem, width) {
     elem.width(width);
     autosize(elem);
 }
 
+// Sets the position of the given label
 function setPosition(elem, pos) {
     elem.data('pos', pos);
     transform(elem);
+
+    var arrow = getArrow(elem);
+    //if (arrow.length > 0) {
+        setArrowOrigin(arrow);
+    //}    
 }
 
+// Makes the given label the top label
 function setTop(elem) {
     $('.annotations .top.label').each(function () {
         $(this).removeClass('top');
     });
     elem.addClass('top');
+}
+
+// Arrows
+function setArrowOrigin(arrow) {
+    var label = getLabel(arrow);
+
+    var scale = getScale(arrow);
+    var globalScale = Math.min(scale.X, scale.Y);
+
+    var p = label.data('pos');
+    var w = label.width() * globalScale / scale.X;
+    var h = label.height() * globalScale / scale.Y;
+
+    var target = arrow.data('target');
+    var center = point(p.X + w / 2, p.Y + h / 2);
+
+    var anchors = [];
+    anchors.push( point(center.X - w / 2, center.Y) );
+    anchors.push( point(center.X + w / 2, center.Y) );
+    anchors.push( point(center.X, center.Y - h / 2) );
+    anchors.push( point(center.X, center.Y + h / 2) );
+
+    var origin = anchors.map(function (a) {
+        var dc = point(a.X - center.X, a.Y - center.Y);
+        var dt = point(a.X - target.X, a.Y - target.Y);
+
+        if (dc.X != 0) {
+            dc = dc.X; dt = dt.X;
+        } else {
+            dc = dc.Y; dt = dt.Y;
+        }
+
+        if (Math.sign(dc) != Math.sign(dt)) {
+            return { a:a, d:Math.abs(dt) };
+        } else {
+            return { a:a, d:-1 };
+        }
+    }).reduce(function (max, x) {
+        return (x.d > max.d) ? x : max;
+    }).a
+
+    var midpoint = point(origin.X + 10 * Math.sign(origin.X - center.X), 
+                         origin.Y + 10 * Math.sign(origin.Y - center.Y));
+
+    arrow.data('origin', origin)
+         .data('midpoint', midpoint);
+    transformArrow(arrow);
+}
+
+function setArrowTarget(arrow, t) {
+    arrow.data('target', t);
+    setArrowOrigin(arrow);
+
+    transformArrow(arrow);
+}
+
+function setArrowHeadSize(arrow, s) {
+    var marker = arrow.children('defs')
+                      .children('.arrowHead');
+
+    marker.attr('viewBox', `0 0 ${s} ${s}`)
+          .attr('markerWidth', s)
+          .attr('markerHeight', s)
+          .attr('refX', s * 0.75)
+          .attr('refY', s / 2)
+          .children('path')
+          .attr('d', `M 0 0 L ${s} ${s / 2} L 0 ${s} z`);
+    
+    arrow.children('.arrowLine')
+         .attr('marker-end', `url(#${marker.attr('id')})`);
+}
+
+function transformArrow(arrow) {
+    var scale = getScale(arrow);
+    var lineWidth = 3 * Math.min(scale.X, scale.Y, 1.0); 
+    
+    var pts = []
+    pts.push(arrow.data('origin'));
+    pts.push(arrow.data('midpoint'));
+    pts.push(arrow.data('target'));
+
+    pts.forEach(function (a, i) {
+        pts[i] = point(a.X * scale.X, a.Y * scale.Y);
+    });
+
+    arrow.children('.arrowLine')
+         .css('stroke-width', `${lineWidth}`)
+         .attr('d', `M ${pts[0].X} ${pts[0].Y} ` +
+                    `L ${pts[1].X} ${pts[1].Y} ` +
+                    `L ${pts[2].X} ${pts[2].Y} `);
 }
 
 // Initializes the label for the Javascript
@@ -105,19 +226,22 @@ function resizeEnd() {
 
 // Dragging
 function dragLabel(ev) {
-    if (drag.elem == null) {
+    var elem = drag.elem;
+
+    if (elem == null) {
         return;
     }
 
-    var scale = getScale(drag.elem);
+    var scale = getScale(elem);
 
     var curr = point(ev.clientX, ev.clientY);
     var delta = point((curr.X - drag.prev.X) / scale.X, (curr.Y - drag.prev.Y) / scale.Y);
     drag.prev = curr;
 
-    var pos = drag.elem.data('pos');
-    setPosition(drag.elem, point(Math.round(pos.X + delta.X), 
-                                 Math.round(pos.Y + delta.Y)));
+    // Drag the label
+    var pos = elem.data('pos');
+    setPosition(elem, point(Math.round(pos.X + delta.X),
+                            Math.round(pos.Y + delta.Y)));
 }
 
 function dragEnd() {

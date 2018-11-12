@@ -99,7 +99,10 @@ let update (model : BoxSelectionModel) (act : BoxSelectionAction) =
             { model with boxes = model.selectedBoxes |> HSet.fold (fun m i -> HMap.remove i m) model.boxes
                          selectedBoxes = HSet.empty }
 
-        | ClearSelection -> { model with selectedBoxes = HSet.empty}
+        | ClearSelection ->
+            { model with selectedBoxes = HSet.empty}
+        | MouseMoved p ->
+            { model with sceneHit = p }
         | _ -> model
                         
 let myCss = { kind = Stylesheet; name = "semui-overrides"; url = "semui-overrides.css" }
@@ -132,6 +135,7 @@ let mkISg (model : MBoxSelectionModel) (box : MVisibleBox) =
                 Sg.onClick (fun _ -> Select box.id)
                 Sg.onEnter (fun _ -> Enter box.id)
                 Sg.onLeave (fun () -> Exit)
+                Sg.onMouseMove MouseMoved
             ] else List.empty
 
         return Sg.box color box.geometry
@@ -148,8 +152,18 @@ let mkISg (model : MBoxSelectionModel) (box : MVisibleBox) =
 
 let renderView (model : MBoxSelectionModel) =
 
-    let frustum =
-        Mod.constant (Frustum.perspective 60.0 0.1 100.0 1.0)
+    let boxes =
+        model.boxes 
+            |> AMap.toASet 
+            |> ASet.map (function (_, b) -> mkISg model b)
+            |> Sg.set
+            |> Sg.shader {
+                do! DefaultSurfaces.trafo
+                do! DefaultSurfaces.vertexColor
+                do! DefaultSurfaces.simpleLighting
+            }
+            |> Sg.fillMode model.rendering.fillMode
+            |> Sg.cullMode model.rendering.cullMode
 
     let controllers =
         alist {
@@ -189,22 +203,12 @@ let renderView (model : MBoxSelectionModel) =
             }
 
     let scene = 
-        model.boxes 
-            |> AMap.toASet 
-            |> ASet.map (function (_, b) -> mkISg model b)
-            |> Sg.set
-            |> Sg.shader {
-                do! DefaultSurfaces.trafo
-                do! DefaultSurfaces.vertexColor
-                do! DefaultSurfaces.simpleLighting
-            }
-            |> Sg.fillMode model.rendering.fillMode
-            |> Sg.cullMode model.rendering.cullMode
-            |> Sg.andAlso floor
-            |> Sg.andAlso controllers        
+        Sg.group [boxes; floor; controllers] 
+            |> Sg.noEvents
 
-    FreeFlyController.controlledControl model.camera CameraMessage frustum
+    FreeFlyController.controlledControl model.camera CameraMessage model.frustum
         (AttributeMap.ofList [
+            //attribute "data-samples" "8"        // FIXME: This and targeting annotations does not combine well
             style "width:100%; height: 100%"
         ]) scene
 
@@ -271,7 +275,8 @@ let controlsView (model : MBoxSelectionModel) =
           
 let initial =
     {
-        camera           = FreeFlyController.initial            
+        camera           = FreeFlyController.initial
+        frustum          = Frustum.perspective 60.0 0.1 100.0 1.0
         rendering        = RenderingParametersModel.RenderingParameters.initial            
         boxHovered       = None
         boxes            = defaultBox
@@ -292,6 +297,7 @@ let initial =
         trafoKind        = TrafoKind.Translate
         trafoMode        = TrafoController.initial.mode
         nextColor        = ColorIndex 3
+        sceneHit         = V3d.Zero
     }
 
 let app : App<BoxSelectionModel,MBoxSelectionModel,BoxSelectionAction> =

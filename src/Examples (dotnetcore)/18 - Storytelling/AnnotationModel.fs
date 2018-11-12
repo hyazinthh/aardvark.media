@@ -49,16 +49,20 @@ type Annotation = {
 type Annotations = {
     list : Annotation plist
     focus : Annotation option
+    targeting : bool
 }
 
 type AnnotationAction =
     | LabelChanged  of AnnotationId * string
     | LabelMoved    of AnnotationId * V2i
     | LabelResized  of AnnotationId * int
+    | LabelClicked  of AnnotationId
     | Focus         of AnnotationId
     | Blur
     | Add
     | Remove        of AnnotationId
+    | Target
+    | SaveTarget    of V3d
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Label =
@@ -94,3 +98,6 @@ module Annotation =
 
     let setLabelWidth (width : int) (a : Annotation) =
         { a with label = { a.label with width = width }}
+
+    let setTarget (target : V3d option) (a : Annotation) =
+        { a with target = target }

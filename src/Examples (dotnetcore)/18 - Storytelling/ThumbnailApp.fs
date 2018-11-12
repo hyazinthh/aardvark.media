@@ -16,11 +16,17 @@ module private Helpers =
 
     let controlId = lazy (
         use wc = new WebClient ()
-        let result = wc.DownloadString (sprintf "%s/rendering/stats.json" baseAddress)
-        let stats : ClientStatistics list =
-                result |> Pickler.unpickleOfJson           
 
-        stats.Head.name
+        let rec get () =
+            let result = wc.DownloadString (sprintf "%s/rendering/stats.json" baseAddress)
+            let stats : ClientStatistics list =
+                    result |> Pickler.unpickleOfJson
+
+            match stats with
+                | [] -> get ()
+                | x::_ -> x.name
+
+        get ()
     )
 
     // Creates a thumbnail by taking a screenshot

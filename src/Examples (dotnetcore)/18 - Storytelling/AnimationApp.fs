@@ -50,7 +50,6 @@ let animate (duration : RelativeTime) (src : Model) (dest : Model) =
     let destView = dest |> Model.getView
 
     if Reduced.CameraView.equal srcView destView then
-        printfn "EQUAL"
         dest
     else
         let animation = CameraAnimations.interpolate destView duration ""

@@ -19,6 +19,7 @@ module Mutable =
         let _story = Story.Mutable.MStory.Create(__initial.story)
         let _presentation = ResetMod.Create(__initial.presentation)
         let _animation = Animation.Mutable.MAnimation.Create(__initial.animation)
+        let _renderControlSize = ResetMod.Create(__initial.renderControlSize)
         
         member x.appModel = _appModel
         member x.dockConfig = _dockConfig :> IMod<_>
@@ -26,6 +27,7 @@ module Mutable =
         member x.story = _story
         member x.presentation = _presentation :> IMod<_>
         member x.animation = _animation
+        member x.renderControlSize = _renderControlSize :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Model.Model) =
@@ -38,6 +40,7 @@ module Mutable =
                 Story.Mutable.MStory.Update(_story, v.story)
                 ResetMod.Update(_presentation,v.presentation)
                 Animation.Mutable.MAnimation.Update(_animation, v.animation)
+                ResetMod.Update(_renderControlSize,v.renderControlSize)
                 
         
         static member Create(__initial : Model.Model) : MModel = MModel(__initial)
@@ -89,4 +92,10 @@ module Mutable =
                     override x.Get(r) = r.animation
                     override x.Set(r,v) = { r with animation = v }
                     override x.Update(r,f) = { r with animation = f r.animation }
+                }
+            let renderControlSize =
+                { new Lens<Model.Model, Aardvark.Base.V2i>() with
+                    override x.Get(r) = r.renderControlSize
+                    override x.Set(r,v) = { r with renderControlSize = v }
+                    override x.Update(r,f) = { r with renderControlSize = f r.renderControlSize }
                 }

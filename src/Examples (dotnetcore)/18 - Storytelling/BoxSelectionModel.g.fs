@@ -76,6 +76,7 @@ module Mutable =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<BoxSelection.BoxSelectionModel> = Aardvark.Base.Incremental.EqModRef<BoxSelection.BoxSelectionModel>(__initial) :> Aardvark.Base.Incremental.IModRef<BoxSelection.BoxSelectionModel>
         let _camera = Aardvark.UI.Primitives.Mutable.MCameraControllerState.Create(__initial.camera)
+        let _frustum = ResetMod.Create(__initial.frustum)
         let _rendering = RenderingParametersModel.Mutable.MRenderingParameters.Create(__initial.rendering)
         let _boxes = MMap.Create(__initial.boxes, (fun v -> MVisibleBox.Create(v)), (fun (m,v) -> MVisibleBox.Update(m, v)), (fun v -> v))
         let _boxHovered = MOption.Create(__initial.boxHovered)
@@ -83,8 +84,10 @@ module Mutable =
         let _trafoKind = ResetMod.Create(__initial.trafoKind)
         let _trafoMode = ResetMod.Create(__initial.trafoMode)
         let _nextColor = ResetMod.Create(__initial.nextColor)
+        let _sceneHit = ResetMod.Create(__initial.sceneHit)
         
         member x.camera = _camera
+        member x.frustum = _frustum :> IMod<_>
         member x.rendering = _rendering
         member x.boxes = _boxes :> amap<_,_>
         member x.boxHovered = _boxHovered :> IMod<_>
@@ -92,6 +95,7 @@ module Mutable =
         member x.trafoKind = _trafoKind :> IMod<_>
         member x.trafoMode = _trafoMode :> IMod<_>
         member x.nextColor = _nextColor :> IMod<_>
+        member x.sceneHit = _sceneHit :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : BoxSelection.BoxSelectionModel) =
@@ -99,6 +103,7 @@ module Mutable =
                 __current.Value <- v
                 
                 Aardvark.UI.Primitives.Mutable.MCameraControllerState.Update(_camera, v.camera)
+                ResetMod.Update(_frustum,v.frustum)
                 RenderingParametersModel.Mutable.MRenderingParameters.Update(_rendering, v.rendering)
                 MMap.Update(_boxes, v.boxes)
                 MOption.Update(_boxHovered, v.boxHovered)
@@ -106,6 +111,7 @@ module Mutable =
                 ResetMod.Update(_trafoKind,v.trafoKind)
                 ResetMod.Update(_trafoMode,v.trafoMode)
                 ResetMod.Update(_nextColor,v.nextColor)
+                ResetMod.Update(_sceneHit,v.sceneHit)
                 
         
         static member Create(__initial : BoxSelection.BoxSelectionModel) : MBoxSelectionModel = MBoxSelectionModel(__initial)
@@ -127,6 +133,12 @@ module Mutable =
                     override x.Get(r) = r.camera
                     override x.Set(r,v) = { r with camera = v }
                     override x.Update(r,f) = { r with camera = f r.camera }
+                }
+            let frustum =
+                { new Lens<BoxSelection.BoxSelectionModel, Aardvark.Base.Frustum>() with
+                    override x.Get(r) = r.frustum
+                    override x.Set(r,v) = { r with frustum = v }
+                    override x.Update(r,f) = { r with frustum = f r.frustum }
                 }
             let rendering =
                 { new Lens<BoxSelection.BoxSelectionModel, RenderingParametersModel.RenderingParameters>() with
@@ -169,4 +181,10 @@ module Mutable =
                     override x.Get(r) = r.nextColor
                     override x.Set(r,v) = { r with nextColor = v }
                     override x.Update(r,f) = { r with nextColor = f r.nextColor }
+                }
+            let sceneHit =
+                { new Lens<BoxSelection.BoxSelectionModel, Aardvark.Base.V3d>() with
+                    override x.Get(r) = r.sceneHit
+                    override x.Set(r,v) = { r with sceneHit = v }
+                    override x.Update(r,f) = { r with sceneHit = f r.sceneHit }
                 }
