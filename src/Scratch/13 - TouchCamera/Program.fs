@@ -4,7 +4,7 @@ open Aardvark.Application
 open Aardvark.Application.Slim
 open Aardvark.UI
 open Aardium
-open GeoJsonViewer
+open Inc
 
 open Suave
 open Suave.WebPart
@@ -14,7 +14,7 @@ let main argv =
     Ag.initialize()
     Aardvark.Init()
     Aardium.init()
-            
+
     use app = new OpenGlApplication()
     let instance = App.app |> App.start
 
