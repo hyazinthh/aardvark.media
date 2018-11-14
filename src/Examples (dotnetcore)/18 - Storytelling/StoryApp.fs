@@ -67,18 +67,29 @@ module private Helpers =
             | _ -> 
                 model
 
-    let getViewProjTrafo (model : MModel) =
+    let getViewProjTrafo (size : IMod<V2i>) (frustum : IMod<Frustum>) (view : IMod<CameraView>) = 
         let cfg = RenderControlConfig.standard
 
         adaptive {
-            let! s = model.renderControlSize
-            let! f = model.appModel.frustum
-            let! v = model.appModel.camera.view
+            let! s = size
+            let! f = frustum
+            let! v = view
 
             return f |> cfg.adjustAspect s
                      |> Camera.create v
                      |> Camera.viewProjTrafo
         }
+
+    let getViewProjTrafoFromPresentation (presentation : MPresentationParams) (model : MModel) =
+        let view = presentation.view.Current |> Mod.map Reduced.CameraView.restore
+        getViewProjTrafo model.renderControlSize
+                         model.appModel.frustum
+                         view
+        
+    let getViewProjTrafoFromModel (model : MModel) =
+        getViewProjTrafo model.renderControlSize 
+                         model.appModel.frustum 
+                         model.appModel.camera.view
 
     let getSceneHit (model : MModel) =
         model.appModel.sceneHit
@@ -245,7 +256,7 @@ let overlayView (model : MModel) =
                 match cont with
                     | MFrameContent (_, _, annotations) ->
                         if show then
-                            let vp = getViewProjTrafo model
+                            let vp = getViewProjTrafoFromModel model
                             let sceneHit = getSceneHit model
 
                             yield annotations |> AnnotationApp.view vp sceneHit false
@@ -324,17 +335,24 @@ let storyboardView (model : MModel) =
         )
         
     let mkSlide (model : MModel) (slide : MSlide)  =
+        let selected = adaptive {
+            let! id = slide.id
+            let! sel = model.story.selected
+
+            match sel with
+                | None -> return false
+                | Some x -> return! x.id |> Mod.map ((=) id)
+        }
+
+        let animating = adaptive {
+            let! a = model.animation.model.Current
+            return AnimationApp.shouldAnimate a
+        }
+
         onBoot "setupDragEvents($('#__ID__'))" (
             Incremental.div (AttributeMap.ofAMap <| amap {
                 let! id = slide.id
-
-                let! selected = adaptive {
-                    let! sel = model.story.selected
-
-                    match sel with
-                        | None -> return false
-                        | Some x -> return! x.id |> Mod.map ((=) id)
-                }
+                let! selected = selected
 
                 yield clazz ("frame" + if selected then " selected" else "")
                 yield attribute "slide" (string id)
@@ -353,8 +371,20 @@ let storyboardView (model : MModel) =
                     let! content = slide.content
 
                     match content with
-                        | MFrameContent (_, _, annotations) ->
-                            let vp = getViewProjTrafo model
+                        | MFrameContent (_, presentation, annotations) ->
+                            // Since we don't immediately update slides, we have to check
+                            // if the slide is currently selected. In that case, we get the
+                            // view projection trafo directly from the current model (unless we
+                            // are currently animating) rather than the possibly outdated presentation parameters.
+                            let! selected = selected
+                            let! animating = animating
+
+                            let vp = 
+                                if selected && not animating then
+                                    getViewProjTrafoFromModel model
+                                else
+                                    getViewProjTrafoFromPresentation presentation model
+
                             let sceneHit = getSceneHit model
 
                             yield annotations |> AnnotationApp.view vp sceneHit true
