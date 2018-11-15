@@ -14,6 +14,8 @@ module private Helpers =
 
     let baseAddress = "http://localhost:4321"
 
+    let size = V2i (256, 196)
+
     let controlId = lazy (
         use wc = new WebClient ()
 
@@ -32,8 +34,11 @@ module private Helpers =
     // Creates a thumbnail by taking a screenshot
     let create () =
         use wc = new WebClient ()
-        wc.DownloadData (sprintf "%s/rendering/screenshot/%s?w=256&h=196&samples=8" baseAddress controlId.Value)
+        wc.DownloadData (sprintf "%s/rendering/screenshot/%s?w=%d&h=%d&samples=8" baseAddress controlId.Value size.X size.Y)
             |> Thumbnail.create
+
+// Thumbnail size
+let size = size
 
 // Adds a thumbnail request
 let request (id : SlideId) (model : Model) = 

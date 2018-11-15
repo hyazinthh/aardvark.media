@@ -67,6 +67,15 @@ module private Helpers =
             | _ -> 
                 model
 
+    let getFrustum (model : MModel) =
+        model.appModel.frustum
+
+    let getView (model : MModel) =
+        model.appModel.camera.view
+
+    let getViewFromPresentation (p : MPresentationParams) =
+        p.view.Current |> Mod.map Reduced.CameraView.restore
+
     let getViewProjTrafo (size : IMod<V2i>) (frustum : IMod<Frustum>) (view : IMod<CameraView>) = 
         let cfg = RenderControlConfig.standard
 
@@ -79,17 +88,9 @@ module private Helpers =
                      |> Camera.create v
                      |> Camera.viewProjTrafo
         }
-
-    let getViewProjTrafoFromPresentation (presentation : MPresentationParams) (model : MModel) =
-        let view = presentation.view.Current |> Mod.map Reduced.CameraView.restore
-        getViewProjTrafo model.renderControlSize
-                         model.appModel.frustum
-                         view
         
     let getViewProjTrafoFromModel (model : MModel) =
-        getViewProjTrafo model.renderControlSize 
-                         model.appModel.frustum 
-                         model.appModel.camera.view
+        getViewProjTrafo model.renderControlSize (getFrustum model) (getView model)
 
     let getSceneHit (model : MModel) =
         model.appModel.sceneHit
@@ -371,7 +372,7 @@ let storyboardView (model : MModel) =
                     let! content = slide.content
 
                     match content with
-                        | MFrameContent (_, presentation, annotations) ->
+                        | MFrameContent (_, p, a) ->
                             // Since we don't immediately update slides, we have to check
                             // if the slide is currently selected. In that case, we get the
                             // view projection trafo directly from the current model (unless we
@@ -379,16 +380,18 @@ let storyboardView (model : MModel) =
                             let! selected = selected
                             let! animating = animating
 
+                            let s = Mod.constant ThumbnailApp.size
+
                             let vp = 
                                 if selected && not animating then
-                                    getViewProjTrafoFromModel model
+                                    getViewProjTrafo s (getFrustum model) (getView model)
                                 else
-                                    getViewProjTrafoFromPresentation presentation model
+                                    getViewProjTrafo s (getFrustum model) (getViewFromPresentation p)
 
                             let sceneHit = getSceneHit model
 
-                            yield annotations |> AnnotationApp.view vp sceneHit true
-                                              |> UI.map AnnotationAction
+                            yield a |> AnnotationApp.view vp sceneHit true
+                                    |> UI.map AnnotationAction
                         | _ -> ()
                 }
             
