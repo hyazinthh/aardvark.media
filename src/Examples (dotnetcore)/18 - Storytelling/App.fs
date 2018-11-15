@@ -53,7 +53,16 @@ let update (model : Model) (act : Action) =
             let p = model.provenance |> ProvenanceApp.update model.story a
             let m = ProvenanceApp.restore model.appModel p
 
-            model |> Lens.set Model.Lens.provenance p
+            // TODO: When the user goes to a different provenance state, we deselect
+            // the currently selected slide. If this is useful is not clear at
+            // this point.
+            let updateStory =
+                match a with
+                    | Goto _ -> StoryApp.update DeselectSlide
+                    | _ -> id
+
+            model |> updateStory
+                  |> Lens.set Model.Lens.provenance p
                   |> Lens.set Model.Lens.appModel m
         
         | StoryAction a ->
