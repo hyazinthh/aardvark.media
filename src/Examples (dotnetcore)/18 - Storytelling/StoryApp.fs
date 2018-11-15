@@ -153,6 +153,9 @@ let update (msg : StoryAction) (model : Model) =
         | AddTextSlide _ ->
             model
 
+        | DuplicateSlide id ->
+            model |> saveAndUpdate (Story.duplicateById id)
+
         | DeselectSlide ->
             model |> saveAndUpdate (Story.select None)
 
@@ -274,6 +277,9 @@ let storyboardView (model : MModel) =
         { kind = Script; name = "storyboardScript"; url = "Storyboard.js" }
     ]
 
+    let disableClickPropagation x =
+        onBoot "disableClickPropagation($('#__ID__'))" x
+
     let addSlideButton (before : SlideId option) =
         onBoot "initAddButton($('#__ID__'))" (
             div [clazz "add button"] [
@@ -369,6 +375,8 @@ let storyboardView (model : MModel) =
                         img []
                     )
 
+                    // TODO: May wanna move this into another Incremental.div
+                    // to prevent the thumbnail from constantly updating
                     let! content = slide.content
 
                     match content with
@@ -395,7 +403,7 @@ let storyboardView (model : MModel) =
                         | _ -> ()
                 }
             
-                onBoot "disableClickPropagation($('#__ID__'))" (
+                disableClickPropagation (
                     Incremental.div (AttributeMap.ofAMap <| amap {
                         let! id = slide.id
                         yield clazz "ui icon remove slide button"
@@ -403,6 +411,17 @@ let storyboardView (model : MModel) =
 
                     }) <| AList.ofList [
                         i [clazz "remove icon"] []
+                    ]
+                )
+
+                disableClickPropagation (
+                    Incremental.div (AttributeMap.ofAMap <| amap {
+                        let! id = slide.id
+                        yield clazz "ui icon duplicate slide button"
+                        yield onClick (fun _ -> DuplicateSlide id)
+
+                    }) <| AList.ofList [
+                        i [clazz "copy icon"] []
                     ]
                 )
 

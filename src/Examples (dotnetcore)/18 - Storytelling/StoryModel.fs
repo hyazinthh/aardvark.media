@@ -96,6 +96,7 @@ type StoryAction =
     | MoveSlide          of SlideId * SlideId option * SlideId option
     | AddFrameSlide      of SlideId option
     | AddTextSlide       of SlideId option
+    | DuplicateSlide     of SlideId
     | DeselectSlide
     | ThumbnailUpdated   of SlideId * Thumbnail
     | ToggleAnnotations
@@ -117,6 +118,9 @@ module Slide =
 
     let isFrame (slide : Slide) =
         slide |> content |> Content.isFrame
+
+    let duplicate (slide : Slide) =
+        { slide with id = SlideId.generate () }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Story =
@@ -218,6 +222,13 @@ module Story =
 
     let removeById (id : SlideId) (s : Story) =
         s |> remove (s |> findById id)
+
+    let duplicate (slide : Slide) (s : Story) =
+        let d = Slide.duplicate slide
+        s |> insertAfter d slide
+
+    let duplicateById (id : SlideId) (s : Story) =
+        s |> duplicate (s |> findById id)
 
     let set (slide : Slide) (value : Slide) (s : Story) =
         { s with slides = s.slides |> PList.set (s |> findInList slide) value
