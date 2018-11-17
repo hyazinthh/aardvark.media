@@ -5,6 +5,8 @@
 }
 
 .rootSvg {
+    width: 100%;
+    height: 100%;
     user-select: none;
 }
 
@@ -12,13 +14,19 @@
     cursor: pointer;
 }
 
-.node circle {
-    stroke: steelblue;
-    stroke-width: 3px;
+.node rect {
+    stroke: rgb(93, 97, 104);
+    stroke-width: 2px;
+    fill: rgb(55, 57, 61);
 }
 
 .node text {
-    font: 10px sans-serif;
+    font: 12px sans-serif;
+    fill: #fff;
+}
+
+.selected.node text {
+    font-weight: bold;
 }
 
 .link {

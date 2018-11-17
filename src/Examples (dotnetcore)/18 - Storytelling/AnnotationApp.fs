@@ -25,20 +25,6 @@ module private Helpers =
         let (index, _) = findById id a
         { a with list = a.list |> PList.remove index }
 
-module private Svg =
-
-    let inline g x = elemNS "g" Svg.svgNS x
-
-    let inline marker x = elemNS "marker" Svg.svgNS x
-
-    let inline foreignObject x = elemNS "foreignObject" Svg.svgNS x
-
-module private Incremental =
-
-    module Svg =
-
-        let inline g x = Incremental.elemNS "g" Svg.svgNS x
-
 let init = {
     list = PList.empty
     focus = None

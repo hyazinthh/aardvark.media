@@ -1,28 +1,17 @@
-﻿var rootSvg, svgContainer, chart, linkLayer, nodeLayer, tree;
+﻿var tree = d3.tree();
 var rootCurr = null
 var root = null;
+var json = null;
 var padding = 15;
 var gapLevel = 75;
-
-function initChart() {
-    rootSvg = document.getElementsByClassName('rootSvg')[0];
-    svgContainer = rootSvg.parentElement;
-
-    chart = d3.select('.rootSvg');
-    linkLayer = chart.append('g');
-    nodeLayer = chart.append('g');
-
-    tree = d3.tree();
-
-    window.addEventListener('resize', redraw);
-}
 
 function getX(x) {
     return padding + x;
 }
 
 function getY(y) {
-    return padding + y * (svgContainer.clientHeight - padding * 2); 
+    var container = $('.rootSvg').parent();
+    return padding + y * (container.height() - padding * 2); 
 }
 
 function getWidth(x) {
@@ -62,12 +51,56 @@ function key(node) {
     return node.data.id;
 }
 
-function fill(d) {
-    return (d.data.id === json.current) ? 'palegreen' : '#fff';
+function clazz(n) {
+    return selected(n) ? 'selected node' : 'node';
+}
+
+function selected(d) {
+    return d.data.id === json.current;
+}
+
+function hovered() {
+    return d3.select(this.parentNode)
+             .classed('hovered');
+}
+
+function shadow(d) {
+    var id = null;
+
+    if (selected(d)) {
+        id = $('filter.shadowSelected').attr('id');
+        
+    } else if (hovered.call(this)) {
+        id = $('filter.shadowHovered').attr('id');
+    }
+
+    return (id !== null) ? `url(#${id})` : null;
 }
 
 function radius(d) {
-    return (d.data.id === json.current) ? '10' : '8';
+    return selected(d) ? 4 : 2;
+}
+
+function size(d) {
+    return selected(d) ? 20 : 16;
+}
+
+function rectOffset(d) {
+    return -size(d) / 2;
+}
+
+function mouseEnter() {
+    d3.select(this)
+      .classed('hovered', true)
+      .selectAll('rect')
+      .attr('filter', shadow);
+}
+
+function mouseLeave() {
+    d3.select(this)
+      .classed('hovered', false)
+      .selectAll('rect')
+      .attr('filter', shadow);
 }
 
 function getPreviousPos(d) {
@@ -114,7 +147,7 @@ function update(data) {
     root.descendants().forEach(function (d) {
         d.y = d.x;
         d.x = d.depth * gapLevel;
-        rootSvg.style.width = getWidth(d.x) + 'px';
+        $('.rootSvg').width(getWidth(d.x));
     });
 
     // Draw tree
@@ -130,8 +163,9 @@ function redraw() {
     }
 
     // Update, add and remove links
-    var link = linkLayer.selectAll('.link')
-        .data(root.descendants().slice(1), key)
+    var link = d3.select('.linkLayer')
+                 .selectAll('.link')
+                 .data(root.descendants().slice(1), key)
 
     var linkEnter =
         link.enter()
@@ -148,20 +182,29 @@ function redraw() {
         .attr('d', diagonal);
 
     // Update, add and remove nodes
-    var node = nodeLayer.selectAll('.node')
-        .data(root.descendants(), key)
+    var node = d3.select('.nodeLayer')
+                 .selectAll('.node')
+                 .data(root.descendants(), key);
 
+    // Enter
     var nodeEnter =
         node.enter()
             .append('g')
-                .attr('class', 'node')
+                .attr('class', clazz)
                 .attr('transform', translateInit)
                 .on('click', click)
+                .on('mouseenter', mouseEnter)
+                .on('mouseleave', mouseLeave);
 
     nodeEnter
-        .append('circle')
-            .attr('r', radius)
-            .attr('fill', fill);
+        .append('rect')
+            .attr('filter', shadow)
+            .attr('x', rectOffset)
+            .attr('y', rectOffset)
+            .attr('rx', radius)
+            .attr('ry', radius)
+            .attr('width', size)
+            .attr('height', size);
 
     nodeEnter
         .append('text')
@@ -174,19 +217,30 @@ function redraw() {
     nodeEnter.transition()
         .attr('transform', translate);
 
+    // Exit
     node.exit().remove();
+
+    // Update
+    node.attr('class', clazz);
 
     node.transition()
         .attr('transform', translate);
 
-    node.selectAll('circle')
+    node.selectAll('rect')
+        .attr('filter', shadow)
         .transition()
             .ease(d3.easeElastic.amplitude(2))
             .duration(1000)
-                .attr('r', radius)
-                .attr('fill', fill);
+                .attr('x', rectOffset)
+                .attr('y', rectOffset)            
+                .attr('rx', radius)
+                .attr('ry', radius)            
+                .attr('width', size)
+                .attr('height', size);                
 }
 
 function click(d) {
     aardvark.processEvent($('.provenanceView').attr('id'), 'onnodeclick', d.data.id);
 }
+
+window.addEventListener('resize', redraw);

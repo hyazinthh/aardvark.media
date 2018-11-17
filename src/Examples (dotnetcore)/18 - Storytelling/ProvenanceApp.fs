@@ -145,6 +145,48 @@ let view (p : MProvenance) =
         { kind = Script; name = "provenanceScript"; url = "Provenance.js" }
     ]
 
+    let colorSelected = C3d (0.75, 0.95, 0.18);
+    let colorHovered = C3d (0.2, 0.8, 0.99);
+
+    let dropShadow (name : string) (color : C3d) =
+        let colorMatrix =
+            sprintf  "%f 0 0 0 0, 0 %f 0 0 0, 0 0 %f 0 0, 0 0 0 1 0" color.R color.G color.B
+
+        Svg.filter [
+            clazz name
+            attribute "x" "-50%"
+            attribute "y" "-50%"
+            attribute "width" "200%"
+            attribute "height" "200%"
+        ] [
+            Svg.feColorMatrix [
+                attribute "type" "matrix"
+                attribute "result" "whiteOut"
+                attribute "in" "SourceGraphic"
+                attribute "values" "0 0 0 0 1, 0 0 0 0 1, 0 0 0 0 1, 0 0 0 1 0"
+            ]
+
+            Svg.feColorMatrix [
+                attribute "type" "matrix"
+                attribute "result" "colorOut"
+                attribute "in" "whiteOut"
+                attribute "color-interpolation-filters" "sRGB"
+                attribute "values" colorMatrix
+            ]
+
+            Svg.feGaussianBlur [
+                attribute "result" "blurOut"
+                attribute "in" "colorOut"
+                attribute "stdDeviation" "2"
+            ]
+
+            Svg.feBlend [
+                attribute "in" "SourceGraphic"
+                attribute "in2" "blurOut"
+                attribute "mode" "normal"
+            ]
+        ]
+        
     let provenanceData = adaptive {
         let! t = p.tree
         
@@ -156,10 +198,16 @@ let view (p : MProvenance) =
 
     div [ clazz "provenanceView"; onNodeClick Goto ] [
         require dependencies (
-            onBoot "initChart()" (
-                onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
-                    Svg.svg [ clazz "rootSvg"; style "width:100%; height:100%" ] []
-                )
+            onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
+                Svg.svg [ clazz "rootSvg" ] [
+                    Svg.defs [] [
+                        dropShadow "shadowSelected" colorSelected
+                        dropShadow "shadowHovered" colorHovered
+                    ]
+
+                    Svg.g [ clazz "linkLayer" ] []
+                    Svg.g [ clazz "nodeLayer" ] []
+                ]
             )
         )
     ]

@@ -28,6 +28,7 @@
     <EmbeddedResource Include="Provenance.js" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Lens.fs" />
+    <Compile Include="Svg.fs" />
     <Compile Include="ThreadPool.fs" />
     <Compile Include="PList.fs" />
     <Compile Include="BoxSelectionModel.fs" />
