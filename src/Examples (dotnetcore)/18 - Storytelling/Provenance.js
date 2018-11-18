@@ -59,9 +59,8 @@ function selected(d) {
     return d.data.id === json.current;
 }
 
-function hovered() {
-    return d3.select(this.parentNode)
-             .classed('hovered');
+function hovered(d) {
+    return (d.data.id === json.highlight) || d3.select(this.parentNode).classed('hovered');
 }
 
 function shadow(d) {
@@ -70,7 +69,7 @@ function shadow(d) {
     if (selected(d)) {
         id = $('filter.shadowSelected').attr('id');
         
-    } else if (hovered.call(this)) {
+    } else if (hovered.call(this, d)) {
         id = $('filter.shadowHovered').attr('id');
     }
 
@@ -89,11 +88,14 @@ function rectOffset(d) {
     return -size(d) / 2;
 }
 
-function mouseEnter() {
+function mouseEnter(d) {
     d3.select(this)
       .classed('hovered', true)
       .selectAll('rect')
       .attr('filter', shadow);
+
+    var recv = $('.provenanceView').attr('id');
+    aardvark.processEvent(recv, 'onnodemouseenter', d.data.id);
 }
 
 function mouseLeave() {
@@ -101,6 +103,14 @@ function mouseLeave() {
       .classed('hovered', false)
       .selectAll('rect')
       .attr('filter', shadow);
+
+    var recv = $('.provenanceView').attr('id');
+    aardvark.processEvent(recv, 'onnodemouseleave');
+}
+
+function click(d) {
+    var recv = $('.provenanceView').attr('id');
+    aardvark.processEvent(recv, 'onnodeclick', d.data.id);
 }
 
 function getPreviousPos(d) {
@@ -237,10 +247,6 @@ function redraw() {
                 .attr('ry', radius)            
                 .attr('width', size)
                 .attr('height', size);                
-}
-
-function click(d) {
-    aardvark.processEvent($('.provenanceView').attr('id'), 'onnodeclick', d.data.id);
 }
 
 window.addEventListener('resize', redraw);

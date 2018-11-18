@@ -38,12 +38,18 @@ type Node = {
 [<DomainType>]
 type Provenance = {
     tree : ZTree<Node>
+    hovered : NodeId option
+    highlight : NodeId option
 }
 
 type ProvenanceAction =
-    | Update of AppModel * AppAction
-    | Goto of NodeId
+    | Update            of AppModel * AppAction
+    | Goto              of NodeId
     | Undo
+    | SetHighlight      of NodeId
+    | RemoveHighlight
+    | MouseEnter        of NodeId
+    | MouseLeave
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Node =

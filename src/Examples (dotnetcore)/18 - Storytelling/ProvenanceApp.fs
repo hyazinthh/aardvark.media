@@ -102,9 +102,20 @@ module private Helpers =
     let onNodeClick (cb : NodeId -> 'msg) =
         onEvent "onnodeclick" [] (List.head >> Pickler.unpickleOfJson >> NodeId.parse >> cb)
 
+    // Fired when the mouse enters a node
+    let onNodeMouseEnter (cb : NodeId -> 'msg) =
+        onEvent "onnodemouseenter" [] (List.head >> Pickler.unpickleOfJson >> NodeId.parse >> cb)
+
+    // Fired when the mouse leaves a node
+    let onNodeMouseLeave (cb : unit -> 'msg) =
+        onEvent "onnodemouseleave" [] (ignore >> cb)
+
 let init (model : AppModel) =
-    { tree = Node.create (Reduced.State.create model) None
-                |> ZTree.single  }
+    let s = Reduced.State.create model
+
+    { tree = Node.create s None |> ZTree.single 
+      hovered = None
+      highlight = None }
 
 let restore (model : AppModel) (p : Provenance) =
     Reduced.State.restore model <| Provenance.state p  
@@ -137,6 +148,18 @@ let update (story : Story) (msg : ProvenanceAction) (p : Provenance) =
             p.tree |> ZTree.parent
                    |> Option.map (fun t -> { p with tree = t } )
                    |> Option.defaultValue p
+
+        | MouseEnter id ->
+            { p with hovered = Some id }
+
+        | MouseLeave ->
+            { p with hovered = None }
+
+        | SetHighlight id ->
+            { p with highlight = Some id }
+
+        | RemoveHighlight ->
+            { p with highlight = None }
 
 let view (p : MProvenance) =
     let dependencies = [
@@ -189,14 +212,23 @@ let view (p : MProvenance) =
         
     let provenanceData = adaptive {
         let! t = p.tree
+        let! h = p.highlight |> Mod.map (Option.map string >> Option.defaultValue "")
         
+        // TODO: It might be possible to increase performance by handling
+        // the highlight property with a separate channel that does not trigger the
+        // recomputation of the whole tree
         let json = t.Root.ToJson Provenance.Node.properties
-        return sprintf @"{ ""current"" : ""%A"" , ""tree"" : %s }" t.Value.id json
+        return sprintf @"{ ""current"" : ""%A"" ,  ""highlight"" : ""%s"" , ""tree"" : %s }" t.Value.id h json
     } 
 
     let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
 
-    div [ clazz "provenanceView"; onNodeClick Goto ] [
+    div [ 
+        clazz "provenanceView"
+        onNodeClick Goto
+        onNodeMouseEnter MouseEnter
+        onNodeMouseLeave (fun _ -> MouseLeave)
+    ] [
         require dependencies (
             onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
                 Svg.svg [ clazz "rootSvg" ] [

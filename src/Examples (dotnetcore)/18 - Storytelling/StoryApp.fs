@@ -104,6 +104,10 @@ module private Helpers =
             cb (x.[0].Value, x.[1], x.[2])
         )
 
+    // TODO: Remove this once media has fixed its onMouseLeave
+    let onMouseLeave (cb : V2i -> 'msg) =
+        onEvent "onmouseleave" ["{ X: event.clientX, Y: event.clientY  }"] (List.head >> Pickler.json.UnPickleOfString >> cb)
+
 let init = {
     slides = PList.empty
     selected = None
@@ -155,9 +159,21 @@ let update (msg : StoryAction) (model : Model) =
 
         | DuplicateSlide id ->
             model |> saveAndUpdate (Story.duplicateById id)
+                  |> restore true
 
         | DeselectSlide ->
             model |> saveAndUpdate (Story.select None)
+
+        | MouseEnterSlide id ->
+            let slide = model.story |> Story.findById id
+            match slide.content with
+                | FrameContent (n, _, _) ->
+                    model |> Lens.update Model.Lens.provenance (ProvenanceApp.update model.story <| SetHighlight n.id)
+                | _ ->
+                    model
+
+        | MouseLeaveSlide ->
+            model |> Lens.update Model.Lens.provenance (ProvenanceApp.update model.story RemoveHighlight)
 
         | ThumbnailUpdated (id, t) ->
             let slide = model.story |> Story.tryFindById id
@@ -351,6 +367,18 @@ let storyboardView (model : MModel) =
                 | Some x -> return! x.id |> Mod.map ((=) id)
         }
 
+        let highlighted = adaptive {
+            let! cont = slide.content
+            let! hover = model.provenance.hovered
+
+            match cont with
+                | MFrameContent (n, _, _) ->
+                    let! id = n.id
+                    return hover |> Option.map ((=) id) |> Option.defaultValue false
+                | _ ->
+                    return false
+        }
+
         let animating = adaptive {
             let! a = model.animation.model.Current
             return AnimationApp.shouldAnimate a
@@ -360,10 +388,14 @@ let storyboardView (model : MModel) =
             Incremental.div (AttributeMap.ofAMap <| amap {
                 let! id = slide.id
                 let! selected = selected
+                let! highlighted = highlighted
 
-                yield clazz ("frame" + if selected then " selected" else "")
-                yield attribute "slide" (string id)
-                yield onClick (if selected then (fun _ -> DeselectSlide) else (fun _ -> SelectSlide id))
+                yield clazz <| "frame" + if selected then " selected" else ""
+                                       + if highlighted then " highlighted" else ""
+                yield attribute "slide" <| string id
+                yield onClick <| if selected then (fun _ -> DeselectSlide) else (fun _ -> SelectSlide id)
+                yield onMouseEnter (fun _ -> MouseEnterSlide id)
+                yield onMouseLeave (fun _ -> MouseLeaveSlide)
 
             }) <| AList.ofList [
                 Incremental.div (AttributeMap.ofList [clazz "thumbnail"]) <| alist {

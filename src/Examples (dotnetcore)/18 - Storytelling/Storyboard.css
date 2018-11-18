@@ -67,11 +67,15 @@
     box-shadow: 0 0 2px 1px rgba(50, 203, 253, 0.863);
 }
 
+.storyboard .frame.highlighted:not(.selected) {
+    box-shadow: 0 0 2px 1px rgba(50, 203, 253, 0.863);
+}
+
 .storyboard .frame.selected {
     box-shadow: 0 0 2px 1px rgba(190, 243, 45, 0.822);
 }
 
-.storyboard .frame:not(.static) * {
+.storyboard .frame:not(.static) {
     cursor: pointer;
 }
 

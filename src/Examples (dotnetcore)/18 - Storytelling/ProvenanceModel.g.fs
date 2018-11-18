@@ -69,8 +69,12 @@ module Mutable =
         inherit obj()
         let mutable __current : Aardvark.Base.Incremental.IModRef<Provenance.Provenance> = Aardvark.Base.Incremental.EqModRef<Provenance.Provenance>(__initial) :> Aardvark.Base.Incremental.IModRef<Provenance.Provenance>
         let _tree = ResetMod.Create(__initial.tree)
+        let _hovered = MOption.Create(__initial.hovered)
+        let _highlight = MOption.Create(__initial.highlight)
         
         member x.tree = _tree :> IMod<_>
+        member x.hovered = _hovered :> IMod<_>
+        member x.highlight = _highlight :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Provenance.Provenance) =
@@ -78,6 +82,8 @@ module Mutable =
                 __current.Value <- v
                 
                 ResetMod.Update(_tree,v.tree)
+                MOption.Update(_hovered, v.hovered)
+                MOption.Update(_highlight, v.highlight)
                 
         
         static member Create(__initial : Provenance.Provenance) : MProvenance = MProvenance(__initial)
@@ -99,4 +105,16 @@ module Mutable =
                     override x.Get(r) = r.tree
                     override x.Set(r,v) = { r with tree = v }
                     override x.Update(r,f) = { r with tree = f r.tree }
+                }
+            let hovered =
+                { new Lens<Provenance.Provenance, Microsoft.FSharp.Core.Option<Provenance.NodeId>>() with
+                    override x.Get(r) = r.hovered
+                    override x.Set(r,v) = { r with hovered = v }
+                    override x.Update(r,f) = { r with hovered = f r.hovered }
+                }
+            let highlight =
+                { new Lens<Provenance.Provenance, Microsoft.FSharp.Core.Option<Provenance.NodeId>>() with
+                    override x.Get(r) = r.highlight
+                    override x.Set(r,v) = { r with highlight = v }
+                    override x.Update(r,f) = { r with highlight = f r.highlight }
                 }

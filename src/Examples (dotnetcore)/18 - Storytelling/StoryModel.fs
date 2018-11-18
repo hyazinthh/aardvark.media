@@ -98,6 +98,8 @@ type StoryAction =
     | AddTextSlide       of SlideId option
     | DuplicateSlide     of SlideId
     | DeselectSlide
+    | MouseEnterSlide    of SlideId
+    | MouseLeaveSlide
     | ThumbnailUpdated   of SlideId * Thumbnail
     | ToggleAnnotations
 
