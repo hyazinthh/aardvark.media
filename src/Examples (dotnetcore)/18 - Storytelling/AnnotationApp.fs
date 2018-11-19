@@ -53,7 +53,7 @@ let update (msg : AnnotationAction) (a : Annotations) =
         | Add ->
             let r = rnd.UniformV2d (Box2d (0.25, 0.25, 0.75, 0.75))
             let pos = V2i (r * V2d (baseSize))
-            let x = pos |> Label.create |> Annotation.create None
+            let x = pos |> Label.create |> Annotation.create (Some V3d.Zero)
 
             { a with list = a.list |> PList.append x }
         | Remove id ->
@@ -94,7 +94,7 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                  |> Mod.map2 (||) (isTargeting a)
 
     let mkArrow (a : MAnnotation) =
-        let setData = "targetData.onmessage = function (data) { setArrowTarget($('#__ID__'), data); };" +
+        let setData = "targetData.onmessage = function (data) { console.log('targetData.onmessage called!'); setArrowTarget($('#__ID__'), data); };" +
                       "sizeData.onmessage = function (data) { setArrowHeadSize($('#__ID__'), data); };"
 
         let clipPos = adaptive {
@@ -107,10 +107,14 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                     a.target |> Mod.map (Option.defaultValue V3d.Zero) // FIXME: This line causes issues for some reason
 
             let! vp = viewProjTrafo |> Mod.map (fun t -> t.Forward)
+            printfn "Triggered clipPos mod"
+
             return vp.TransformPosProjFull t
         }
 
         let targetPos = clipPos |> Mod.map (fun cp ->
+            printfn "Triggered targetPos mod"
+
             let u = (cp.XY / cp.W + V2d.II) * 0.5
             V2d (u.X, 1.0 - u.Y) * V2d baseSize
         )

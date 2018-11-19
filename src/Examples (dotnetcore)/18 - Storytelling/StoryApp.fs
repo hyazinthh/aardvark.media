@@ -191,7 +191,7 @@ let update (msg : StoryAction) (model : Model) =
         | _ -> model
 
 let threads (model : Model) =
-    ThumbnailApp.threads model
+    ThreadPool.empty //ThumbnailApp.threads model
 
 let overlayView (model : MModel) =
 
