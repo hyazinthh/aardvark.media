@@ -74,11 +74,11 @@ function initCollapsingFrame(frame) {
 function setupDragEvents(frame) {
 	var storyboard = $('.storyboard');
 
-	frame.attr('draggable', 'true');
+	frame.attr('draggable', true);
 
 	frame.on('dragstart', function (ev) {
 		// Save the id of the slide that is being dragged
-		var slide = $(ev.target).attr('slide');
+		var slide = $(ev.target).attr('data-slide');
 		ev.originalEvent.dataTransfer.setData("text/plain", slide);
 		ev.originalEvent.dataTransfer.dropEffect = 'move';
 
@@ -90,7 +90,7 @@ function setupDragEvents(frame) {
 		var previewFrames = storyboard.find('.preview.frame');
 
 		previewFrames.each(function () {
-			if ($(this).attr('left') !== slide && $(this).attr('right') !== slide) {
+			if ($(this).attr('data-left') !== slide && $(this).attr('data-right') !== slide) {
 				$(this).addClass('droppable');
 			}
 		});
@@ -144,10 +144,10 @@ function setupDropEvents(frame) {
 			// Get id of dragged slide, as well as ids of adjacent slides
 			var slide = ev.originalEvent.dataTransfer.getData("text/plain");
 
-			var left = frame.attr('left');
+			var left = frame.attr('data-left');
 			if (left === undefined) { left = ''; }
 
-			var right = frame.attr('right');
+			var right = frame.attr('data-right');
 			if (right === undefined) { right = ''; }
 
 			// Trigger move event
@@ -188,7 +188,7 @@ function setupThumbnail(img, data) {
 	}
 
 	// Try to get existing thumbnail for this slide
-	var id = frame.attr('slide');
+	var id = frame.attr('data-slide');
 	var entry = thumbnails.get(id);
 
 	// Create new blob or reuse old URL

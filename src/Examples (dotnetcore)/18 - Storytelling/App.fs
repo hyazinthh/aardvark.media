@@ -122,10 +122,8 @@ let threads (model : Model) =
 
 
 let renderView (model : MModel) =
-    // TODO: Adding keyboard events here breaks input events
-    // for the text areas of the annotations
     onBoot "$(document).trigger('resize')" (
-        body [ onResize RenderControlResized (*onKeyDown KeyDown; onKeyUp KeyUp*) ] [
+        body [ onResize RenderControlResized; onKeyDown KeyDown; onKeyUp KeyUp ] [
             model.appModel
                 |> BoxSelectionApp.renderView
                 |> UI.map AppAction

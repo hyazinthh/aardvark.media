@@ -152,21 +152,27 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                       "widthData.onmessage = function (data) { setWidth($('#__ID__'), data); };" +
                       "positionData.onmessage = function (data) { setPosition($('#__ID__'), data); };"
 
-        onBoot (if disabled then "" else "initLabel($('#__ID__'))") (
+        let disablePropagation event =
+            sprintf "$('#__ID__').on('%s', function(e) { e.stopPropagation(); } ); " event
+
+        let init x = 
+            onBoot ("initLabel($('#__ID__')); " + 
+                    disablePropagation "keydown" +
+                    disablePropagation "keypress" +
+                    disablePropagation "keyup") x
+
+        init (
             onBoot' [ "textData", a.label.text |> Mod.channel
                       "widthData", a.label.width |> Mod.channel
                       "positionData", a.label.position |> Mod.channel ] setData (            
                 Incremental.div (AttributeMap.ofAMap <| amap {
-                    yield clazz "label"
+                    yield clazz <| "label" + if disabled then " disabled" else ""
 
                     let! id = a.id
                     yield attribute "data-pos" <| Pickler.jsonToString V2i.Zero
                     yield onLabelMoved (fun p -> (id, p) |> LabelMoved)
                     yield onLabelResized (fun w -> (id, w) |> LabelResized)
                     yield onClick (fun _ -> LabelClicked id)
-
-                    if disabled then
-                        yield attribute "disabled" ""
 
                 }) <| AList.ofList [
                     if not disabled then

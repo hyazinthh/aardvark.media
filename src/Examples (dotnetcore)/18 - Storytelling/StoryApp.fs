@@ -326,11 +326,11 @@ let storyboardView (model : MModel) =
                 yield clazz "collapsing preview frame"
 
                 let! id = slide.id
-                yield attribute "right" (string id)
+                yield attribute "data-right" (string id)
 
                 let! prev = prev
                 if prev.IsSome then 
-                    yield attribute "left" prev.Value 
+                    yield attribute "data-left" prev.Value
                     
             }) <| alist {
                 let! id = slide.id
@@ -350,7 +350,7 @@ let storyboardView (model : MModel) =
 
                 let! last = last
                 if last.IsSome then
-                    yield attribute "left" last.Value
+                    yield attribute "data-left" last.Value
 
             }) <| AList.ofList [
                 yield addSlideButton None
@@ -392,7 +392,7 @@ let storyboardView (model : MModel) =
 
                 yield clazz <| "frame" + if selected then " selected" else ""
                                        + if highlighted then " highlighted" else ""
-                yield attribute "slide" <| string id
+                yield attribute "data-slide" <| string id
                 yield onClick <| if selected then (fun _ -> DeselectSlide) else (fun _ -> SelectSlide id)
                 yield onMouseEnter (fun _ -> MouseEnterSlide id)
                 yield onMouseLeave (fun _ -> MouseLeaveSlide)

@@ -179,6 +179,10 @@ function transformArrow(arrow) {
 // Initializes the label for the Javascript
 // side (dragging, resizing, ...)
 function initLabel (elem) {
+    if (elem.hasClass('disabled')) {
+        return;
+    }
+
     elem.on('mouseenter', function() { if (drag.elem === null) elem.addClass('hovered'); })
         .on('mouseleave', function() { elem.removeClass('hovered'); });
 
