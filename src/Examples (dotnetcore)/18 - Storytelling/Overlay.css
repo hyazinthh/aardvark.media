@@ -27,18 +27,18 @@
     left: 10px;
 }
 
-.render.overlay .frame > .remove.icon {
+.render.overlay .frame > .checkmark.icon {
     display: none;
     top: 10px;
     right: 10px;
     pointer-events: auto;
 }
 
-body:hover .render.overlay .frame > .remove.icon {
+body:hover .render.overlay .frame > .checkmark.icon {
     display: inline-block;
 }
 
-.render.overlay .frame > .remove.icon:hover {
+.render.overlay .frame > .checkmark.icon:hover {
     color: white;
 }
 

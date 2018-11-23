@@ -206,7 +206,7 @@ let overlayView (model : MModel) =
         div [clazz "frame"] [
             i [clazz "huge camera icon"] []
             i [
-                clazz "huge remove link icon"
+                clazz "huge checkmark link icon"
                 onClick (fun _ -> DeselectSlide)
             ] []
 
