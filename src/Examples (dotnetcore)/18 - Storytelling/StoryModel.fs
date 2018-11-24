@@ -143,6 +143,10 @@ module Story =
             | None -> raise (ArgumentException ("No slide selected"))
             | Some s -> s
 
+    let isSelected (slide : Slide) (s : Story) =
+        s.selected |> Option.map (fun s -> s.id = slide.id)
+                   |> Option.defaultValue false
+
     let tryFindIndex (slide : Slide) (s : Story) =
         s.slides |> PList.tryFindIndex' (fun s -> s.id = slide.id)
 
@@ -220,7 +224,7 @@ module Story =
 
     let remove (slide : Slide) (s : Story) =
         { s with slides = s.slides |> PList.remove (s |> findInList slide)
-                 selected = s.selected |> Option.bind (fun s -> if s.id = slide.id then None else Some s) }
+                 selected = if isSelected slide s then None else s.selected }
 
     let removeById (id : SlideId) (s : Story) =
         s |> remove (s |> findById id)
@@ -234,9 +238,7 @@ module Story =
 
     let set (slide : Slide) (value : Slide) (s : Story) =
         { s with slides = s.slides |> PList.set (s |> findInList slide) value
-                 selected = s.selected |> Option.map (fun s ->
-                                if s.id = slide.id then value else s
-                            ) }
+                 selected = if isSelected slide s then Some value else s.selected }
 
     let moveBefore (slide : Slide) (before : Slide) (s : Story) =
         { s with slides = s.slides |> PList.remove (s |> findInList slide)
@@ -259,9 +261,9 @@ module Story =
         { s with slides = s.slides |> PList.set (s |> findInList s.selected.Value) modified 
                  selected = Some modified }
 
-    let isNodeReferenced (node : Node) (s : Story) =
+    let isNodeReferenced (node : Node) (ignoreSelected : bool) (s : Story) =
         s.slides |> PList.tryFind (fun x ->
             match x.content with
                 | TextContent _ -> false
-                | FrameContent (n, _, _) -> (n.id = node.id) && (s.selected <> Some x)
+                | FrameContent (n, _, _) -> (n.id = node.id) && not (ignoreSelected && isSelected x s)
         ) |> Option.isSome

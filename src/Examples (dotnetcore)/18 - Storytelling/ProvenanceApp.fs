@@ -61,7 +61,7 @@ module private Helpers =
                     node |> Node.message
                          |> Option.map ((=) msg)
                          |> Option.defaultValue false
-                         |> (&&) (story |> Story.isNodeReferenced node |> not)
+                         |> (&&) (story |> Story.isNodeReferenced node true |> not)
                          |> (&&) (ZTree.isLeaf tree)                
 
                 match coal with
@@ -76,7 +76,7 @@ module private Helpers =
             input |> Decision.map (fun tree ->
                 let c =
                     tree |> ZTree.filterChildren (fun n ->
-                                (n.message = Some msg) && (story |> Story.isNodeReferenced n |> not)
+                                (n.message = Some msg) && (story |> Story.isNodeReferenced n true |> not)
                             )
                             |> List.filter ZTree.isLeaf
 
@@ -161,7 +161,7 @@ let update (story : Story) (msg : ProvenanceAction) (p : Provenance) =
         | RemoveHighlight ->
             { p with highlight = None }
 
-let view (p : MProvenance) =
+let view (s : MStory) (p : MProvenance) =
     let dependencies = [
         { kind = Script; name = "d3"; url = "http://d3js.org/d3.v5.min.js" }
         { kind = Stylesheet; name = "provenanceStyle"; url = "Provenance.css" }
@@ -213,11 +213,17 @@ let view (p : MProvenance) =
     let provenanceData = adaptive {
         let! t = p.tree
         let! h = p.highlight |> Mod.map (Option.map string >> Option.defaultValue "")
+
+        // TODO: Dependency on the whole story struct is an overkill, can be optimized.
+        let! s = s.Current
+
+        let props n = 
+            ("isReferenced", s |> Story.isNodeReferenced n false |> string) :: (Provenance.Node.properties n)
         
         // TODO: It might be possible to increase performance by handling
         // the highlight property with a separate channel that does not trigger the
         // recomputation of the whole tree
-        let json = t.Root.ToJson Provenance.Node.properties
+        let json = t.Root.ToJson props
         return sprintf @"{ ""current"" : ""%A"" ,  ""highlight"" : ""%s"" , ""tree"" : %s }" t.Value.id h json
     } 
 

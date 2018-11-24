@@ -22,7 +22,15 @@
 
 .node text {
     font: 12px sans-serif;
-    fill: #fff;
+    fill: white;
+}
+
+.referenced.node rect {
+    fill: rgb(167, 168, 168);
+}
+
+.referenced.node text {
+    fill: black;
 }
 
 .selected.node text {

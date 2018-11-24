@@ -51,12 +51,20 @@ function key(node) {
     return node.data.id;
 }
 
-function clazz(n) {
-    return selected(n) ? 'selected node' : 'node';
-}
-
 function selected(d) {
     return d.data.id === json.current;
+}
+
+function referenced(d) {
+    return d.data.isReferenced.toLowerCase() === 'true';
+}
+
+function clazz(n) {
+    var cl = 'node';
+    cl += selected(n) ? ' selected' : '';
+    cl += referenced(n) ? ' referenced' : '';
+
+    return cl;
 }
 
 function hovered(d) {

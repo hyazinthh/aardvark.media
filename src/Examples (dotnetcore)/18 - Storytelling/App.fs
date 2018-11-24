@@ -143,7 +143,7 @@ let controlsView (model : MModel) =
 let provenanceView (model : MModel) =
     body [] [
         model.provenance
-            |> ProvenanceApp.view
+            |> ProvenanceApp.view model.story
             |> UI.map ProvenanceAction
     ]
 
