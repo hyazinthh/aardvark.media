@@ -27,18 +27,23 @@
     left: 10px;
 }
 
-.render.overlay .frame > .checkmark.icon {
+.render.overlay .frame > .confirm.buttons {
     display: none;
+    position: absolute;
     top: 10px;
     right: 10px;
     pointer-events: auto;
 }
 
-body:hover .render.overlay .frame > .checkmark.icon {
+body:hover .render.overlay .frame > .confirm.buttons {
     display: inline-block;
 }
 
-.render.overlay .frame > .checkmark.icon:hover {
+.render.overlay .frame > .confirm.buttons > .icon {
+    color: rgb(93, 97, 104);
+}
+
+.render.overlay .frame > .confirm.buttons > .icon:hover {
     color: white;
 }
 

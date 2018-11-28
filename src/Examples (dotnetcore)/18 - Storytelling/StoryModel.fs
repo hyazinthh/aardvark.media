@@ -78,7 +78,7 @@ type Slide = {
 }
 
  // A story is a list of slides and optionally
- // a currently selected slide
+ // a currently selected slide with unsaved changes
 [<DomainType>]
 type Story = {
     slides : Slide plist
@@ -91,6 +91,7 @@ type StoryAction =
     | AnnotationAction   of AnnotationAction
     | Forward
     | Backward
+    | Commit
     | SelectSlide        of SlideId
     | RemoveSlide        of SlideId
     | MoveSlide          of SlideId * SlideId option * SlideId option
@@ -130,8 +131,14 @@ module Story =
     [<AutoOpen>]
     module private Helpers =
 
+        let tryFindInListById (id : SlideId) (s : Story) =
+            s.slides |> PList.tryFindIndex (fun s -> s.id = id)
+
+        let findInListById (id : SlideId) (s : Story) =
+            s.slides |> PList.findIndex (fun s -> s.id = id)
+
         let findInList (slide : Slide) (s : Story) =
-            s.slides |> PList.findIndex (fun s -> s.id = slide.id)
+            s |> findInListById slide.id
 
     let isActive (s : Story) =
         Option.isSome s.selected
@@ -236,9 +243,13 @@ module Story =
     let duplicateById (id : SlideId) (s : Story) =
         s |> duplicate (s |> findById id)
 
-    let set (slide : Slide) (value : Slide) (s : Story) =
-        { s with slides = s.slides |> PList.set (s |> findInList slide) value
-                 selected = if isSelected slide s then Some value else s.selected }
+    let tryUpdateById (id : SlideId) (f : Slide -> Slide) (s : Story) =
+        match s |> tryFindInListById id with
+            | None -> s
+            | Some idx -> 
+                { s with slides = s.slides |> PList.update idx f 
+                         selected = s.selected |> Option.filter (fun s -> s.id = id) 
+                                               |> Option.map f }
 
     let moveBefore (slide : Slide) (before : Slide) (s : Story) =
         { s with slides = s.slides |> PList.remove (s |> findInList slide)
@@ -257,9 +268,17 @@ module Story =
     let length (s : Story) =
         s.slides |> PList.count
 
-    let saveChanges (modified : Slide) (s : Story) =
-        { s with slides = s.slides |> PList.set (s |> findInList s.selected.Value) modified 
-                 selected = Some modified }
+    // Updates the story with changes made to the selected slide
+    let commit (s : Story) =
+        match s.selected with
+            | None -> s 
+            | Some sel -> { s with slides = s.slides |> PList.set (s |> findInList sel) sel }
+
+    // Resets changes made to the selected slide
+    let reset (s : Story) =
+        match s.selected with
+            | None -> s
+            | Some sel -> { s with selected = s |> findById sel.id |> Some }
 
     let isNodeReferenced (node : Node) (ignoreSelected : bool) (s : Story) =
         s.slides |> PList.tryFind (fun x ->

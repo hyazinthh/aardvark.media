@@ -36,7 +36,6 @@
     <Compile Include="AppModel.fs" />
     <Compile Include="Decision.fs" />
     <Compile Include="ZTree.fs" />
-    <Compile Include="ZList.fs" />
     <Compile Include="Reduced.fs" />
     <Compile Include="ProvenanceModel.fs" />
     <Compile Include="AnnotationModel.fs" />

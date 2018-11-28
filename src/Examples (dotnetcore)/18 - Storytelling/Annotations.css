@@ -59,6 +59,7 @@
 
 .annotations .disabled.label {
     opacity: 1.0;
+    z-index: auto;
     pointer-events: none;
 }
 

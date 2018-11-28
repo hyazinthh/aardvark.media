@@ -25,33 +25,28 @@ module private Helpers =
                     | x -> x
 
             let sel = { sel with content = content }
-            model |> Lens.update Model.Lens.story (Story.set sel sel)
+            model |> Lens.update Model.Lens.story (Story.select <| Some sel)
 
-    // Sets the story and updates the provenance
-    // accordingly
-    let saveAndUpdate (f : Story -> Story) (model : Model) =
+    // Commits changes to the story
+    let commit (model : Model) =
 
-        // Updates the currently selected slide (if not None)
-        // with changes from model
-        let saveChanges (model : Model) =
-
-            let updateSelected (sel : Slide) =
-                match sel.content with
-                    | TextContent _ -> sel
-                    | FrameContent (_, _, a) ->
+        let updateFrame (s : Slide) =
+            match s.content with
+                | TextContent _ -> model
+                | FrameContent (_, p, a) ->
+                    let s =
                         let n = Provenance.current model.provenance
-                        let p = Model.getPresentation model
-                        sel |> Lens.set Slide.Lens.content (FrameContent (n, p, a))
+                        let p = if Model.isAnimating model then p else Model.getPresentation model
 
-            model |> Lens.update Model.Lens.story (fun s ->
-                match s.selected with
-                    | None -> s
-                    | Some sel ->
-                        s |> Story.saveChanges (sel |> updateSelected)
-            )
+                        s |> Lens.set Slide.Lens.content (FrameContent (n, p, a))
 
-        model |> if Model.isAnimating model then id else saveChanges
-              |> Lens.update Model.Lens.story f
+                    model |> Lens.update Model.Lens.story (Story.select <| Some s)
+                          |> if Model.isAnimating model then id else ThumbnailApp.syncRequest s.id
+
+        model.story |> Story.trySelected
+                    |> Option.map updateFrame
+                    |> Option.defaultValue model
+                    |> Lens.update Model.Lens.story Story.commit
 
     // Restores the model from the selected slide
     let restore (animate : bool) (model : Model) =
@@ -108,6 +103,9 @@ module private Helpers =
     let onMouseLeave (cb : V2i -> 'msg) =
         onEvent "onmouseleave" ["{ X: event.clientX, Y: event.clientY  }"] (List.head >> Pickler.json.UnPickleOfString >> cb)
 
+    let onClick' (cb : unit -> 'msg list) =
+        onEvent' "onclick" [] (ignore >> cb >> Seq.ofList)
+
 let init = {
     slides = PList.empty
     selected = None
@@ -120,20 +118,23 @@ let update (msg : StoryAction) (model : Model) =
         | AnnotationAction a ->
             model |> Annotations.update a
 
-        | Forward when (Story.isActive model.story) ->
-            model |> saveAndUpdate Story.forward
+        | Forward ->
+            model |> Lens.update Model.Lens.story Story.forward
                   |> restore true
 
-        | Backward when (Story.isActive model.story) ->
-            model |> saveAndUpdate Story.backward
+        | Backward ->
+            model |> Lens.update Model.Lens.story Story.backward
                   |> restore true
+
+        | Commit ->
+            model |> commit
 
         | SelectSlide id -> 
-            model |> saveAndUpdate (Story.selectById (Some id))
+            model |> Lens.update Model.Lens.story (Story.selectById <| Some id)
                   |> restore true
 
         | RemoveSlide id ->
-            model |> saveAndUpdate (Story.removeById id)
+            model |> Lens.update Model.Lens.story (Story.removeById id)
 
         | MoveSlide (id, l, r) ->
             let story = 
@@ -142,27 +143,27 @@ let update (msg : StoryAction) (model : Model) =
                 else
                     Story.moveBeforeById id r.Value
 
-            model |> saveAndUpdate story
+            model |> Lens.update Model.Lens.story story
 
         | AddFrameSlide before ->
             let slide = Slide.frame model.provenance (Model.getPresentation model) Thumbnail.empty
-            let story = 
+            let add = 
                 match before with
                     | None -> Story.append slide
                     | Some id -> Story.insertBeforeById slide id
 
-            model |> saveAndUpdate story
+            model |> Lens.update Model.Lens.story add
                   |> ThumbnailApp.request slide.id
 
         | AddTextSlide _ ->
             model
 
         | DuplicateSlide id ->
-            model |> saveAndUpdate (Story.duplicateById id)
+            model |> Lens.update Model.Lens.story (Story.duplicateById id)
                   |> restore true
 
         | DeselectSlide ->
-            model |> saveAndUpdate (Story.select None)
+            model |> Lens.update Model.Lens.story (Story.select None)
 
         | MouseEnterSlide id ->
             let slide = model.story |> Story.findById id
@@ -176,19 +177,13 @@ let update (msg : StoryAction) (model : Model) =
             model |> Lens.update Model.Lens.provenance (ProvenanceApp.update model.story RemoveHighlight)
 
         | ThumbnailUpdated (id, t) ->
-            let slide = model.story |> Story.tryFindById id
+            let f s = { s with thumbnail = t } 
 
-            match slide with
-                | Some s -> 
-                    model |> saveAndUpdate (Story.set s { s with thumbnail = t })
-                | None -> 
-                    model
-            |> ThumbnailApp.removeRequest id
+            model |> Lens.update Model.Lens.story (Story.tryUpdateById id f)
+                  |> ThumbnailApp.removeRequest id
 
         | ToggleAnnotations ->
             model |> Lens.update (Model.Lens.story |. Story.Lens.showAnnotations) not
-
-        | _ -> model
 
 let threads (model : Model) =
     ThumbnailApp.threads model
@@ -205,10 +200,18 @@ let overlayView (model : MModel) =
 
         div [clazz "frame"] [
             i [clazz "huge camera icon"] []
-            i [
-                clazz "huge checkmark link icon"
-                onClick (fun _ -> DeselectSlide)
-            ] []
+
+            div [clazz "confirm buttons"] [
+                i [
+                    clazz "huge checkmark link icon"
+                    onClick' (fun _ -> [Commit; DeselectSlide])
+                ] []
+
+                i [
+                    clazz "huge remove link icon"
+                    onClick (fun _ -> DeselectSlide)
+                ] []
+            ]
 
             Incremental.div (AttributeMap.ofList [clazz "annotation menu"]) <|
                 alist {
@@ -274,15 +277,15 @@ let overlayView (model : MModel) =
                 let! cont = selected.Value.content
 
                 match cont with
-                    | MFrameContent (_, _, annotations) ->
+                    | MFrameContent (_, _, a) ->
                         if show then
                             let vp = getViewProjTrafoFromModel model
                             let sceneHit = getSceneHit model
 
-                            yield annotations |> AnnotationApp.view vp sceneHit false
-                                              |> UI.map AnnotationAction
+                            yield a |> AnnotationApp.view vp sceneHit false
+                                    |> UI.map AnnotationAction
 
-                        yield overlay annotations
+                        yield overlay a
                     | _ -> ()
         }
     )
@@ -379,11 +382,6 @@ let storyboardView (model : MModel) =
                     return false
         }
 
-        let animating = adaptive {
-            let! a = model.animation.model.Current
-            return AnimationApp.shouldAnimate a
-        }
-
         onBoot "setupDragEvents($('#__ID__'))" (
             Incremental.div (AttributeMap.ofAMap <| amap {
                 let! id = slide.id
@@ -413,20 +411,8 @@ let storyboardView (model : MModel) =
 
                     match content with
                         | MFrameContent (_, p, a) ->
-                            // Since we don't immediately update slides, we have to check
-                            // if the slide is currently selected. In that case, we get the
-                            // view projection trafo directly from the current model (unless we
-                            // are currently animating) rather than the possibly outdated presentation parameters.
-                            let! selected = selected
-                            let! animating = animating
-
                             let s = Mod.constant ThumbnailApp.size
-
-                            let vp = 
-                                if selected && not animating then
-                                    getViewProjTrafo s (getFrustum model) (getView model)
-                                else
-                                    getViewProjTrafo s (getFrustum model) (getViewFromPresentation p)
+                            let vp = getViewProjTrafo s (getFrustum model) (getViewFromPresentation p)
 
                             let sceneHit = getSceneHit model
 
