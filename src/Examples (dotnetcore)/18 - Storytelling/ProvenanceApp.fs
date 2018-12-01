@@ -113,12 +113,15 @@ module private Helpers =
 let init (model : AppModel) =
     let s = Reduced.State.create model
 
-    { tree = Node.create s None |> ZTree.single 
-      hovered = None
-      highlight = None }
+    { tree = Node.create s None |> ZTree.single
+      highlight = None
+      preview = None }
 
 let restore (model : AppModel) (p : Provenance) =
-    Reduced.State.restore model <| Provenance.state p  
+    p.preview |> Option.defaultValue p.tree
+              |> ZTree.value
+              |> Node.state
+              |> Reduced.State.restore model
 
 let update (story : Story) (msg : ProvenanceAction) (p : Provenance) =
     match msg with
@@ -150,10 +153,13 @@ let update (story : Story) (msg : ProvenanceAction) (p : Provenance) =
                    |> Option.defaultValue p
 
         | MouseEnter id ->
-            { p with hovered = Some id }
+            let t = p.tree |> ZTree.root
+                           |> ZTree.find (fun n -> n.id = id)
+
+            { p with preview = Some t }
 
         | MouseLeave ->
-            { p with hovered = None }
+            { p with preview = None }
 
         | SetHighlight id ->
             { p with highlight = Some id }

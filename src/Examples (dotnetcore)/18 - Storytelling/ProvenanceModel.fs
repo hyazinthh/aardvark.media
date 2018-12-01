@@ -38,8 +38,8 @@ type Node = {
 [<DomainType>]
 type Provenance = {
     tree : ZTree<Node>
-    hovered : NodeId option
     highlight : NodeId option
+    preview : ZTree<Node> option
 }
 
 type ProvenanceAction =

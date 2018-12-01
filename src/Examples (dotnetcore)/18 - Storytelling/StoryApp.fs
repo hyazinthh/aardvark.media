@@ -203,12 +203,12 @@ let overlayView (model : MModel) =
 
             div [clazz "confirm buttons"] [
                 i [
-                    clazz "huge checkmark link icon"
+                    clazz "huge checkmark icon"
                     onClick' (fun _ -> [Commit; DeselectSlide])
                 ] []
 
                 i [
-                    clazz "huge remove link icon"
+                    clazz "huge remove icon"
                     onClick (fun _ -> DeselectSlide)
                 ] []
             ]
@@ -372,12 +372,13 @@ let storyboardView (model : MModel) =
 
         let highlighted = adaptive {
             let! cont = slide.content
-            let! hover = model.provenance.hovered
+            let! preview = model.provenance.preview
 
             match cont with
                 | MFrameContent (n, _, _) ->
                     let! id = n.id
-                    return hover |> Option.map ((=) id) |> Option.defaultValue false
+                    return preview |> Option.map (fun t -> id = t.Value.id)
+                                   |> Option.defaultValue false
                 | _ ->
                     return false
         }
