@@ -68,6 +68,9 @@ let update (model : Model) (act : Action) =
         | StoryAction a ->
             model |> StoryApp.update a
 
+        | SessionAction a ->
+            model |> SessionApp.update a
+
         | AppAction a when not (Model.isAnimating model) ->
             let s = BoxSelectionApp.update model.appModel a
             let p = model.provenance |> ProvenanceApp.update model.story (Update (s, a))
@@ -185,9 +188,13 @@ let view (model : MModel) =
                     div [style "color:white; font-size:large; background-color:red; width:100%; height:100%"] [text msg]
                 ]  
             | None ->
-                model.dockConfig |> docking [
-                    style "width:100%; height:100%; overflow:hidden"
-                    onLayoutChanged UpdateConfig
+                div [style "width:100%; height:100%; overflow:hidden"] [
+                    SessionApp.view |> UI.map SessionAction
+
+                    model.dockConfig |> docking [
+                        style "width:100%; height:100%; overflow:hidden"
+                        onLayoutChanged UpdateConfig
+                    ]
                 ]
     )
  

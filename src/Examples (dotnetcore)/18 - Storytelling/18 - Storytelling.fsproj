@@ -18,6 +18,7 @@
     <ProjectReference Include="..\10 - Drawing3D\10 - Drawing3D.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Menu.css" />
     <EmbeddedResource Include="Annotations.js" />
     <EmbeddedResource Include="Annotations.css" />
     <EmbeddedResource Include="Overlay.css" />
@@ -43,10 +44,12 @@
     <Compile Include="StoryModel.fs" />
     <Compile Include="ProvenanceApp.fs" />
     <Compile Include="AnimationModel.fs" />
+    <Compile Include="SessionModel.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="AnimationApp.fs" />
     <Compile Include="ThumbnailApp.fs" />
     <Compile Include="StoryApp.fs" />
+    <Compile Include="SessionApp.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />

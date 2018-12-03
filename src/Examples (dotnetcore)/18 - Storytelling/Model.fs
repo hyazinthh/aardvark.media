@@ -10,11 +10,13 @@ open BoxSelection
 open Provenance
 open Story
 open Animation
+open Session
 
 type Action =
     | AppAction             of AppAction
     | ProvenanceAction      of ProvenanceAction
     | StoryAction           of StoryAction
+    | SessionAction         of SessionAction
     | UpdateConfig          of DockConfig
     | NodeClick             of NodeId
     | AnimationAction       of AnimationAction
