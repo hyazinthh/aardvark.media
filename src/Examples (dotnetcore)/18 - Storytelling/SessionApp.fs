@@ -99,10 +99,15 @@ let view =
         "$('.session.item').popup('hide');"
 
     let openDialog =
-        "aardvark.processEvent('__ID__', 'onchoose', aardvark.dialog.showOpenDialog({properties: ['openFile']}));"
+        "aardvark.processEvent('__ID__', 'onchoose', aardvark.dialog.showOpenDialog({" +
+            "properties: ['openFile']," + 
+            "filters: [{ name: 'Session files', extensions: ['xml'] }]" +
+            "}));"
 
     let saveDialog =
-        "aardvark.processEvent('__ID__', 'onsave', aardvark.dialog.showSaveDialog({properties: []}));"
+        "aardvark.processEvent('__ID__', 'onsave', aardvark.dialog.showSaveDialog({" +
+            "filters: [{ name: 'Session files', extensions: ['xml'] }]" +
+            "}));"
 
     require dependencies (
         onBoot initPopup (
