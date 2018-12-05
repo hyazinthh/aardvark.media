@@ -211,7 +211,7 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
 
                         if disabled then
                             yield attribute "disabled" ""
-                    }) AList.empty
+                    }) (Mod.constant "")
                 ]
             )
         )
