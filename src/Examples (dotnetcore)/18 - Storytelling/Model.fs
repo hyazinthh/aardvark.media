@@ -30,7 +30,6 @@ type Model = {
     dockConfig : DockConfig
     provenance : Provenance
     story : Story
-    presentation : bool
     animation : Animation
     renderControlSize : V2i
 }

@@ -15,31 +15,39 @@ module private Events =
     let onResize (cb : V2i -> 'msg) =
         onEvent "onresize" ["{ X: $(document).width(), Y: $(document).height() }"] (List.head >> Pickler.json.UnPickleOfString >> cb)
 
+let regularModeConfig =
+    config {
+        content (
+            vertical 1.0 [
+                horizontal 5.0 [
+                    element { id "render"; title "Render View"; isCloseable false; weight 10 }
+
+                    stack 3.5 (Some "controls") [
+                        { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
+                        { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
+                    ]
+                ]
+
+                element { id "provenance"; title "History"; isCloseable true; weight 1 }
+                element { id "storyboard"; title "Storyboard"; isCloseable true; weight 1.25 }
+            ]
+        )
+        appName "Box Selection"
+        useCachedConfig false
+    }
+
+let presentationModeConfig =
+    config {
+        content (element { id "render"; isCloseable false })
+        useCachedConfig false
+    }
+
 let initial =
     let model = BoxSelectionApp.initial in {
         appModel = model
-        dockConfig = config {
-                        content (
-                            vertical 1.0 [
-                                horizontal 5.0 [
-                                    element { id "render"; title "Render View"; isCloseable false; weight 10 }
-
-                                    stack 3.5 (Some "controls") [
-                                        { id = "controls"; title = Some "Controls"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
-                                        { id = "presentation"; title = Some "Presentation"; weight = 1.0; deleteInvisible = None; isCloseable = Some true }
-                                    ]
-                                ]
-
-                                element { id "provenance"; title "History"; isCloseable true; weight 1 }
-                                element { id "storyboard"; title "Storyboard"; isCloseable true; weight 1.25 }
-                            ]
-                        )
-                        appName "Box Selection"
-                        useCachedConfig false
-                    }
+        dockConfig = regularModeConfig
         provenance = ProvenanceApp.init model
         story = StoryApp.init
-        presentation = false
         animation = AnimationApp.init model
         renderControlSize = V2i.One
     }
@@ -84,11 +92,13 @@ let update (model : Model) (act : Action) =
         | KeyDown Keys.R ->
             { model with dockConfig = initial.dockConfig }
 
-        | KeyDown Keys.P ->
-            { model with presentation = true }
+        | KeyDown Keys.P when Story.length model.story > 0 ->
+            { model with dockConfig = presentationModeConfig }
+                |> StoryApp.update StartPresentation
 
         | KeyDown Keys.Escape ->
-            { model with presentation = false }
+            { model with dockConfig = regularModeConfig }
+                |> StoryApp.update EndPresentation
 
         | KeyDown Keys.Right 
         | KeyDown Keys.Enter ->
@@ -188,8 +198,14 @@ let view (model : MModel) =
                     div [style "color:white; font-size:large; background-color:red; width:100%; height:100%"] [text msg]
                 ]  
             | None ->
-                div [style "width:100%; height:100%; overflow:hidden"] [
-                    SessionApp.view |> UI.map SessionAction
+                div [
+                    style "width:100%; height:100%; overflow:hidden"
+                ] [
+                    Incremental.div AttributeMap.Empty <| alist {
+                        let! p = model.story.presentation
+                        if not p then
+                            yield SessionApp.view |> UI.map SessionAction
+                    }
 
                     model.dockConfig |> docking [
                         style "width:100%; height:100%; overflow:hidden"

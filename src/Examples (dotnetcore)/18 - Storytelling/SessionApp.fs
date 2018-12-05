@@ -8,6 +8,8 @@ open Model
 open Session
 open Provenance
 
+#nowarn "8989"
+
 [<AutoOpen>]
 module private Helpers =
     open MBrace.FsPickler
@@ -85,7 +87,7 @@ let update (msg : SessionAction) (model : Model) =
         | _ ->
             model
 
-let view : DomNode<SessionAction> =
+let view =
     let dependencies = Html.semui @ [
         { kind = Stylesheet; name = "menuStyle"; url = "Menu.css" }
     ]

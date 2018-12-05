@@ -16,16 +16,16 @@ module private Helpers =
     module Annotations =
         // Updates the annotations
         let update (msg : AnnotationAction) (model : Model) =
-            let sel = Option.get model.story.selected
 
-            let content =
-                match sel.content with
-                    | FrameContent (n, p, a) -> 
-                        FrameContent (n, p, a |> AnnotationApp.update msg)               
-                    | x -> x
+            let updateContent = function
+                | FrameContent (n, p, a) ->
+                    FrameContent (n, p, a |> AnnotationApp.update msg)
+                | x -> x
 
-            let sel = { sel with content = content }
-            model |> Lens.update Model.Lens.story (Story.select <| Some sel)
+            let sel = model.story |> Story.trySelected
+                                  |> Option.map (Lens.update Slide.Lens.content updateContent)
+
+            model |> Lens.update Model.Lens.story (Story.select sel)
 
     // Commits changes to the story
     let commit (model : Model) =
@@ -50,7 +50,8 @@ module private Helpers =
 
     // Restores the model from the selected slide
     let restore (animate : bool) (model : Model) =
-        match model.story |> Story.selected |> Slide.content with
+
+        let restoreContent = function
             | FrameContent (node, presentation, _) ->
                 let p = model.provenance |> ProvenanceApp.update model.story (Goto node.id)
                 let m = ProvenanceApp.restore model.appModel p
@@ -61,6 +62,10 @@ module private Helpers =
                       |> if animate then AnimationApp.animate 0.5 model else id
             | _ -> 
                 model
+
+        model.story |> Story.trySelected
+                    |> Option.map (Slide.content >> restoreContent)
+                    |> Option.defaultValue model
 
     let getFrustum (model : MModel) =
         model.appModel.frustum
@@ -111,6 +116,7 @@ let init = {
     selected = None
     showAnnotations = false
     thumbnailRequests = HSet.empty
+    presentation = false
 }
 
 let update (msg : StoryAction) (model : Model) =
@@ -128,6 +134,13 @@ let update (msg : StoryAction) (model : Model) =
 
         | Commit ->
             model |> commit
+
+        | StartPresentation ->
+            model |> Lens.update Model.Lens.story Story.startPresentation
+                  |> restore true
+
+        | EndPresentation ->
+            model |> Lens.update Model.Lens.story Story.endPresentation
 
         | SelectSlide id -> 
             model |> Lens.update Model.Lens.story (Story.selectById <| Some id)
@@ -272,20 +285,22 @@ let overlayView (model : MModel) =
         ]) <| alist {
             let! selected = model.story.selected
             let! show = model.story.showAnnotations
+            let! presentation = model.story.presentation
 
             if selected.IsSome then
                 let! cont = selected.Value.content
 
                 match cont with
                     | MFrameContent (_, _, a) ->
-                        if show then
+                        if show || presentation then
                             let vp = getViewProjTrafoFromModel model
                             let sceneHit = getSceneHit model
 
-                            yield a |> AnnotationApp.view vp sceneHit false
+                            yield a |> AnnotationApp.view vp sceneHit presentation
                                     |> UI.map AnnotationAction
 
-                        yield overlay a
+                        if not presentation then
+                            yield overlay a
                     | _ -> ()
         }
     )

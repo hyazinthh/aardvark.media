@@ -194,11 +194,13 @@ module Mutable =
         let _selected = MOption.Create(__initial.selected, (fun v -> MSlide.Create(v)), (fun (m,v) -> MSlide.Update(m, v)), (fun v -> v))
         let _showAnnotations = ResetMod.Create(__initial.showAnnotations)
         let _thumbnailRequests = MSet.Create(__initial.thumbnailRequests)
+        let _presentation = ResetMod.Create(__initial.presentation)
         
         member x.slides = _slides :> alist<_>
         member x.selected = _selected :> IMod<_>
         member x.showAnnotations = _showAnnotations :> IMod<_>
         member x.thumbnailRequests = _thumbnailRequests :> aset<_>
+        member x.presentation = _presentation :> IMod<_>
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Story.Story) =
@@ -209,6 +211,7 @@ module Mutable =
                 MOption.Update(_selected, v.selected)
                 ResetMod.Update(_showAnnotations,v.showAnnotations)
                 MSet.Update(_thumbnailRequests, v.thumbnailRequests)
+                ResetMod.Update(_presentation,v.presentation)
                 
         
         static member Create(__initial : Story.Story) : MStory = MStory(__initial)
@@ -248,4 +251,10 @@ module Mutable =
                     override x.Get(r) = r.thumbnailRequests
                     override x.Set(r,v) = { r with thumbnailRequests = v }
                     override x.Update(r,f) = { r with thumbnailRequests = f r.thumbnailRequests }
+                }
+            let presentation =
+                { new Lens<Story.Story, System.Boolean>() with
+                    override x.Get(r) = r.presentation
+                    override x.Set(r,v) = { r with presentation = v }
+                    override x.Update(r,f) = { r with presentation = f r.presentation }
                 }

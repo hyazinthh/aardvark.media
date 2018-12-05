@@ -85,6 +85,7 @@ type Story = {
     selected : Slide option
     showAnnotations : bool
     thumbnailRequests : SlideId hset
+    presentation : bool
 }
 
 type StoryAction =
@@ -92,6 +93,8 @@ type StoryAction =
     | Forward
     | Backward
     | Commit
+    | StartPresentation
+    | EndPresentation
     | SelectSlide        of SlideId
     | RemoveSlide        of SlideId
     | MoveSlide          of SlideId * SlideId option * SlideId option
@@ -196,6 +199,15 @@ module Story =
 
     let selectById (id : SlideId option) (s : Story) =
         s |> select (id |> Option.map (fun id -> s |> findById id))
+
+    let startPresentation (s : Story) =
+        match s.selected with
+            | None -> s |> select (first s)
+            | _ -> s
+        |> fun s -> { s with presentation = true }
+
+    let endPresentation (s : Story) =
+        { s with presentation = false }
 
     let forward (s : Story) =
         let r = s.selected |> Option.bind (fun x ->
