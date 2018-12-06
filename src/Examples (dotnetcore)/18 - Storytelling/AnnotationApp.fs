@@ -72,8 +72,8 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
     let onBlur' (cb : unit -> 'msg list) =
         onEvent' "onblur" [] (ignore >> cb >> Seq.ofList)
     
-    let init (content : DomNode<'a>) =
-        onBoot (sprintf "baseWidth=%d; baseHeight=%d;" baseSize.X baseSize.Y) content
+    let init =
+        onBoot (sprintf "setBaseSize(%d, %d);" baseSize.X baseSize.Y)
 
     // Returns if the given annotation is currently
     // focused and targeting

@@ -7,6 +7,20 @@ function point(x, y) {
     return { 'X': x, 'Y': y };
 }
 
+// Sets the base size and triggers recomputation of each label and arrow
+function setBaseSize(width, height) {
+    baseWidth = width;
+    baseHeight = height;
+
+    $('.annotations .annotation').find('.label').each(function () {
+        transform($(this));
+    });
+
+    $('.annotations .annotation').find('.arrow').each(function () {
+        setArrowOrigin($(this));
+    });
+}
+
 // Computes the scale of an element based on the current size
 // of the container and the base size
 function getScale(elem) {
