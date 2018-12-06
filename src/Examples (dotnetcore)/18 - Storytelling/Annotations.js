@@ -47,9 +47,9 @@ function autosize(elem) {
         });
 
     var arrow = getArrow(elem);
-    //if (arrow.length > 0) {
+    if (arrow.length > 0) {
         setArrowOrigin(arrow);
-    //}     
+    }     
 }
 
 // Sets the text of the given label
@@ -73,9 +73,9 @@ function setPosition(elem, pos) {
     transform(elem);
 
     var arrow = getArrow(elem);
-    //if (arrow.length > 0) {
+    if (arrow.length > 0) {
         setArrowOrigin(arrow);
-    //}    
+    }    
 }
 
 // Makes the given label the top label
@@ -89,6 +89,9 @@ function setTop(elem) {
 // Arrows
 function setArrowOrigin(arrow) {
     var label = getLabel(arrow);
+    if (label.length === 0) {
+        return;
+    }
 
     var scale = getScale(arrow);
     var globalScale = Math.min(scale.X, scale.Y);

@@ -413,11 +413,10 @@ let storyboardView (model : MModel) =
 
             }) <| AList.ofList [
                 Incremental.div (AttributeMap.ofList [clazz "thumbnail"]) <| alist {
-                    let updateThumb = "thumbData.onmessage = function (data) { setupThumbnail($('#__ID__'), data); };"
-                    let thumbChannel = slide.thumbnail |> Mod.map string
-                                                       |> Mod.channel
+                    let thumbData = slide.thumbnail |> Mod.map string
+                    let updateThumb = "setupThumbnail($('#__ID__'), __DATA__)"
 
-                    yield onBoot' ["thumbData", thumbChannel] updateThumb (
+                    yield onBootInitial "thumbData" thumbData updateThumb (
                         img []
                     )
 

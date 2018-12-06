@@ -141,7 +141,8 @@ function getPreviousPos(d) {
     }
 
     if (rootCurr !== null) {
-        return rec(d, rootCurr);
+        var p = rec(d, rootCurr);
+        return (p !== null) ? p : { x: d.x, y: d.y };
     } else {
         return { x: d.x, y: d.y };
     }

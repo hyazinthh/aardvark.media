@@ -231,9 +231,9 @@ let view (s : MStory) (p : MProvenance) =
         // recomputation of the whole tree
         let json = t.Root.ToJson props
         return sprintf @"{ ""current"" : ""%A"" ,  ""highlight"" : ""%s"" , ""tree"" : %s }" t.Value.id h json
-    } 
+    }
 
-    let updateChart = "provenanceData.onmessage = function (data) { update(data); };"
+    let updateChart = "update(__DATA__)"
 
     div [ 
         clazz "provenanceView"
@@ -242,7 +242,7 @@ let view (s : MStory) (p : MProvenance) =
         onNodeMouseLeave (fun _ -> MouseLeave)
     ] [
         require dependencies (
-            onBoot' ["provenanceData", provenanceData |> Mod.channel] updateChart (
+            onBootInitial "provenanceData" provenanceData updateChart (
                 Svg.svg [ clazz "rootSvg" ] [
                     Svg.defs [] [
                         dropShadow "shadowSelected" colorSelected

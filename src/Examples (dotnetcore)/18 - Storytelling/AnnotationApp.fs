@@ -94,9 +94,6 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                  |> Mod.map2 (||) (isTargeting a)
 
     let mkArrow (a : MAnnotation) =
-        let setData = "targetData.onmessage = function (data) { setArrowTarget($('#__ID__'), data); };" +
-                      "sizeData.onmessage = function (data) { setArrowHeadSize($('#__ID__'), data); };"
-
         let clipPos = adaptive {
             let! targeting = isTargeting a
 
@@ -120,8 +117,13 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                           |> min 64.0
         )
 
-        onBoot' [ "targetData", targetPos |> Mod.channel 
-                  "sizeData", arrowHeadSize |> Mod.channel ] setData (
+        let setArrowTarget = onBootInitial "targetData" targetPos "setArrowTarget($('#__ID__'), __DATA__)"
+        let setArrowHeadSize = onBootInitial "sizeData" arrowHeadSize "setArrowHeadSize($('#__ID__'), __DATA__)"
+
+        let setData =
+            setArrowTarget >> setArrowHeadSize
+
+        setData (
             Svg.g [
                 clazz "arrow"
                 attribute "data-origin" <| Pickler.jsonToString V2i.Zero
@@ -148,10 +150,6 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
         )
 
     let mkLabel (a : MAnnotation) =
-        let setData = "textData.onmessage = function (data) { setText($('#__ID__'), data); };" +
-                      "widthData.onmessage = function (data) { setWidth($('#__ID__'), data); };" +
-                      "positionData.onmessage = function (data) { setPosition($('#__ID__'), data); };"
-
         let disablePropagation event =
             sprintf "$('#__ID__').on('%s', function(e) { e.stopPropagation(); } ); " event
 
@@ -161,10 +159,15 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
                     disablePropagation "keypress" +
                     disablePropagation "keyup") x
 
+        let setText = onBootInitial "textData" a.label.text "setText($('#__ID__'), __DATA__)"
+        let setWidth = onBootInitial "widthData" a.label.width "setWidth($('#__ID__'), __DATA__)"
+        let setPosition = onBootInitial "positionData" a.label.position "setPosition($('#__ID__'), __DATA__)"
+
+        let setData =
+            setText >> setWidth >> setPosition
+
         init (
-            onBoot' [ "textData", a.label.text |> Mod.channel
-                      "widthData", a.label.width |> Mod.channel
-                      "positionData", a.label.position |> Mod.channel ] setData (            
+            setData (
                 Incremental.div (AttributeMap.ofAMap <| amap {
                     yield clazz <| "label" + if disabled then " disabled" else ""
 
