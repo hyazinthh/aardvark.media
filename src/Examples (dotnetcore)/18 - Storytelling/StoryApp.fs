@@ -9,6 +9,7 @@ open Story
 open Model
 open Provenance
 open Annotations
+open Thumbnail
 
 [<AutoOpen>]
 module private Helpers =
@@ -26,6 +27,11 @@ module private Helpers =
                                   |> Option.map (Lens.update Slide.Lens.content updateContent)
 
             model |> Lens.update Model.Lens.story (Story.select sel)
+
+    let frame (provenance : Provenance) (presentation : PresentationParams) =
+        { id = SlideId.generate ()
+          content = FrameContent (Provenance.current provenance, presentation, AnnotationApp.init)
+          thumbnail = ThumbnailApp.empty }
 
     // Commits changes to the story
     let commit (model : Model) =
@@ -106,10 +112,13 @@ module private Helpers =
 
     // TODO: Remove this once media has fixed its onMouseLeave
     let onMouseLeave (cb : V2i -> 'msg) =
-        onEvent "onmouseleave" ["{ X: event.clientX, Y: event.clientY  }"] (List.head >> Pickler.json.UnPickleOfString >> cb)
+        onEvent "onmouseleave" ["{ X: event.clientX, Y: event.clientY  }"] (List.head >> Pickler.unpickleOfJson >> cb)
 
     let onClick' (cb : unit -> 'msg list) =
         onEvent' "onclick" [] (ignore >> cb >> Seq.ofList)
+
+    let onThumbnailLoaded (cb : V2i -> 'msg) =
+        onEvent "onthumbnailloaded" [] (List.head >> Pickler.unpickleOfJson >> cb)
 
 let init = {
     slides = PList.empty
@@ -159,7 +168,7 @@ let update (msg : StoryAction) (model : Model) =
             model |> Lens.update Model.Lens.story story
 
         | AddFrameSlide before ->
-            let slide = Slide.frame model.provenance (Model.getPresentation model) Thumbnail.empty
+            let slide = frame model.provenance (Model.getPresentation model)
             let add = 
                 match before with
                     | None -> Story.append slide
@@ -189,17 +198,15 @@ let update (msg : StoryAction) (model : Model) =
         | MouseLeaveSlide ->
             model |> Lens.update Model.Lens.provenance (ProvenanceApp.update model.story RemoveHighlight)
 
-        | ThumbnailUpdated (id, t) ->
-            let f s = { s with thumbnail = t } 
-
-            model |> Lens.update Model.Lens.story (Story.tryUpdateById id f)
-                  |> ThumbnailApp.removeRequest id
+        | ThumbnailAction (id, a) ->
+            model |> ThumbnailApp.update id a
 
         | ToggleAnnotations ->
             model |> Lens.update (Model.Lens.story |. Story.Lens.showAnnotations) not
 
 let threads (model : Model) =
-    ThumbnailApp.threads model
+    model |> ThumbnailApp.threads
+          |> ThreadPool.map ThumbnailAction
 
 let overlayView (model : MModel) =
 
@@ -293,10 +300,11 @@ let overlayView (model : MModel) =
                 match cont with
                     | MFrameContent (_, _, a) ->
                         if show || presentation then
+                            let viewport = model.renderControlSize
                             let vp = getViewProjTrafoFromModel model
                             let sceneHit = getSceneHit model
 
-                            yield a |> AnnotationApp.view vp sceneHit presentation
+                            yield a |> AnnotationApp.view viewport vp sceneHit presentation
                                     |> UI.map AnnotationAction
 
                         if not presentation then
@@ -410,10 +418,11 @@ let storyboardView (model : MModel) =
                 yield onClick <| if selected then (fun _ -> DeselectSlide) else (fun _ -> SelectSlide id)
                 yield onMouseEnter (fun _ -> MouseEnterSlide id)
                 yield onMouseLeave (fun _ -> MouseLeaveSlide)
+                yield onThumbnailLoaded (fun s -> ThumbnailAction (id, Resized s))
 
             }) <| AList.ofList [
                 Incremental.div (AttributeMap.ofList [clazz "thumbnail"]) <| alist {
-                    let thumbData = slide.thumbnail |> Mod.map string
+                    let thumbData = slide.thumbnail.data |> Mod.map string
                     let updateThumb = "setupThumbnail($('#__ID__'), __DATA__)"
 
                     yield onBootInitial "thumbData" thumbData updateThumb (
@@ -426,12 +435,12 @@ let storyboardView (model : MModel) =
 
                     match content with
                         | MFrameContent (_, p, a) ->
-                            let s = Mod.constant ThumbnailApp.size
-                            let vp = getViewProjTrafo s (getFrustum model) (getViewFromPresentation p)
+                            let viewport = slide.thumbnail.displaySize
+                            let vp = getViewProjTrafo viewport (getFrustum model) (getViewFromPresentation p)
 
                             let sceneHit = getSceneHit model
 
-                            yield a |> AnnotationApp.view vp sceneHit true
+                            yield a |> AnnotationApp.view viewport vp sceneHit true
                                     |> UI.map AnnotationAction
                         | _ -> ()
                 }

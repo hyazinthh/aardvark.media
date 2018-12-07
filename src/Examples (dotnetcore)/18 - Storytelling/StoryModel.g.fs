@@ -137,11 +137,11 @@ module Mutable =
         let mutable __current : Aardvark.Base.Incremental.IModRef<Story.Slide> = Aardvark.Base.Incremental.EqModRef<Story.Slide>(__initial) :> Aardvark.Base.Incremental.IModRef<Story.Slide>
         let _id = ResetMod.Create(__initial.id)
         let _content = MContent.Create(__initial.content)
-        let _thumbnail = ResetMod.Create(__initial.thumbnail)
+        let _thumbnail = Thumbnail.Mutable.MThumbnail.Create(__initial.thumbnail)
         
         member x.id = _id :> IMod<_>
         member x.content = _content
-        member x.thumbnail = _thumbnail :> IMod<_>
+        member x.thumbnail = _thumbnail
         
         member x.Current = __current :> IMod<_>
         member x.Update(v : Story.Slide) =
@@ -150,7 +150,7 @@ module Mutable =
                 
                 ResetMod.Update(_id,v.id)
                 MContent.Update(_content, v.content)
-                ResetMod.Update(_thumbnail,v.thumbnail)
+                Thumbnail.Mutable.MThumbnail.Update(_thumbnail, v.thumbnail)
                 
         
         static member Create(__initial : Story.Slide) : MSlide = MSlide(__initial)
@@ -180,7 +180,7 @@ module Mutable =
                     override x.Update(r,f) = { r with content = f r.content }
                 }
             let thumbnail =
-                { new Lens<Story.Slide, Story.Thumbnail>() with
+                { new Lens<Story.Slide, Thumbnail.Thumbnail>() with
                     override x.Get(r) = r.thumbnail
                     override x.Set(r,v) = { r with thumbnail = v }
                     override x.Update(r,f) = { r with thumbnail = f r.thumbnail }

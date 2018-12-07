@@ -33,24 +33,3 @@ module HigherOrderTagsExtensions =
         onBoot init (
             onBoot' [name, input |> Mod.channel] update node
         )
-
-    (*let onBootInitial (channels : list<string * IMod<'a> * string>) (node : DomNode<'msg>) =
-        
-        let init =
-            channels |> List.fold (fun accum (_, m, code) ->
-                sprintf "%s %s;" accum (code.Replace ("__DATA__", m |> Mod.force |> Pickler.jsonToString))
-            ) ""
-
-        let update =
-            channels |> List.fold (fun accum (name, _, code) ->
-                sprintf "%s %s.onmessage = function (data) { %s };" accum name (code.Replace ("__DATA__", "data"))
-            ) ""
-
-        let ch =
-            channels |> List.map (fun (n, m, _) ->
-                n, m |> Mod.channel
-            )
-
-        onBoot init (
-            onBoot' ch update node
-        )*)

@@ -208,7 +208,10 @@ function setupThumbnail(img, data) {
 	// Add img element
 	img.attr('src', url);
 	img.on('load', function () {
-		img.parent().width(img.width())
-					.height(img.height());
+		var w = img.width();
+		var h = img.height();
+
+		img.parent().width(w).height(h);
+		aardvark.processEvent(frame.attr('id'), 'onthumbnailloaded', { X: Math.round(w), Y: Math.round(h) });
 	});
 }

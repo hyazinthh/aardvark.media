@@ -8,6 +8,7 @@ open Aardvark.Service.Server
 
 open Model
 open Story
+open Thumbnail
 
 [<AutoOpen>]
 module private Helpers = 
@@ -35,10 +36,12 @@ module private Helpers =
     let create () =
         use wc = new WebClient ()
         wc.DownloadData (sprintf "%s/rendering/screenshot/%s?w=%d&h=%d&samples=8" baseAddress controlId.Value size.X size.Y)
-            |> Thumbnail.create
+            |> ByteArray
 
-// Thumbnail size
-let size = size
+// Empty thumbnail
+let empty =
+    { data = ByteArray Array.empty
+      displaySize = size }
 
 // Adds a thumbnail request
 let request (id : SlideId) (model : Model) = 
@@ -46,19 +49,26 @@ let request (id : SlideId) (model : Model) =
 
 // Adds a blocking thumbnail request
 let syncRequest (id : SlideId) (model : Model) =
-    let f s = { s with thumbnail = create () }
+    let f = Lens.set (Slide.Lens.thumbnail |. Thumbnail.Lens.data) <| create ()
     model |> Lens.update Model.Lens.story (Story.tryUpdateById id f)
 
-// Removes a thumbnail request
-let removeRequest (id : SlideId) (model : Model) =
-    model |> Lens.update (Model.Lens.story |. Story.Lens.thumbnailRequests) (HSet.remove id)
+let update (id : SlideId) (msg : ThumbnailAction) (model : Model) =
+    match msg with
+        | Updated d ->
+            let f = Lens.set (Slide.Lens.thumbnail |. Thumbnail.Lens.data) d
+
+            model |> Lens.update Model.Lens.story (Story.tryUpdateById id f)
+                  |> Lens.update (Model.Lens.story |. Story.Lens.thumbnailRequests) (HSet.remove id)
+        | Resized s ->
+            let f = Lens.set (Slide.Lens.thumbnail |. Thumbnail.Lens.displaySize) s
+            model |> Lens.update Model.Lens.story (Story.tryUpdateById id f)
 
 let threads (model : Model) =
 
     let thumbnailProc (id : SlideId) =
         proclist {
             do! Async.SwitchToNewThread ()
-            yield ThumbnailUpdated (id, create ())
+            yield id, Updated <| create ()
         }
 
     model.story.thumbnailRequests

@@ -64,7 +64,7 @@ let update (msg : AnnotationAction) (a : Annotations) =
             a |> updateById (Annotation.setTarget <| Some p) a.focus.Value.id
               |> Lens.set Annotations.Lens.targeting false
 
-let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool) (annotations : MAnnotations) =
+let view (viewport : IMod<V2i>) (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool) (annotations : MAnnotations) =
 
     let preventBlur (x : DomNode<'a>) =
         onBoot "$('#__ID__').on('mousedown', function (event) { event.preventDefault(); });" x
@@ -72,8 +72,11 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
     let onBlur' (cb : unit -> 'msg list) =
         onEvent' "onblur" [] (ignore >> cb >> Seq.ofList)
     
-    let init =
-        onBoot (sprintf "setBaseSize(%d, %d);" baseSize.X baseSize.Y)
+    let setBaseSize =
+        onBoot (sprintf "setBaseSize(%s);" <| Pickler.jsonToString baseSize)
+
+    let setViewport =
+        onBootInitial "viewportData" viewport "setViewport(__DATA__)"
 
     // Returns if the given annotation is currently
     // focused and targeting
@@ -236,9 +239,11 @@ let view (viewProjTrafo : IMod<Trafo3d>) (sceneHit : IMod<V3d>) (disabled : bool
     ]
 
     require dependencies (
-        init (
-            Incremental.Svg.svg (AttributeMap.ofList [
-                clazz "annotations"
-            ]) <| AList.map mkAnnotation annotations.list
+        setViewport (
+            setBaseSize (
+                Incremental.Svg.svg (AttributeMap.ofList [
+                    clazz "annotations"
+                ]) <| AList.map mkAnnotation annotations.list
+            )
         )
     )

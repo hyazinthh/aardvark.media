@@ -1,17 +1,26 @@
-﻿var baseWidth = 1;
-var baseHeight = 1;
+﻿var baseSize = point(1, 1);
+var viewport = point(1, 1);
 var drag = { elem: null, prev: null };
 var resize = { elem: null, prev: null };
 
 function point(x, y) {
-    return { 'X': x, 'Y': y };
+    return { X: x, Y: y };
 }
 
-// Sets the base size and triggers recomputation of each label and arrow
-function setBaseSize(width, height) {
-    baseWidth = width;
-    baseHeight = height;
+// Sets the viewport size
+function setViewport(size) {
+    viewport = size;
+    transformAll();
+}
 
+// Sets the base size
+function setBaseSize(size) {
+    baseSize = size;
+    transformAll();
+}
+
+// Transforms all labels and arrows
+function transformAll() {
     $('.annotations .annotation').find('.label').each(function () {
         transform($(this));
     });
@@ -22,10 +31,9 @@ function setBaseSize(width, height) {
 }
 
 // Computes the scale of an element based on the current size
-// of the container and the base size
-function getScale(elem) {
-    var cont = elem.parents('.annotations');
-    return point(cont.width() / baseWidth, cont.height() / baseHeight);
+// of the viewport and the base size
+function getScale() {
+    return point(viewport.X / baseSize.X, viewport.Y / baseSize.Y);
 }
 
 // Gets the corresponding arrow of a label
@@ -43,7 +51,7 @@ function getLabel(arrow) {
 // Transforms the given label based on its scale and position
 function transform(elem) {
     var pos = elem.data('pos');
-    var scale = getScale(elem);
+    var scale = getScale();
     var globalScale = Math.min(scale.X, scale.Y);
 
     elem.css({
@@ -107,7 +115,7 @@ function setArrowOrigin(arrow) {
         return;
     }
 
-    var scale = getScale(arrow);
+    var scale = getScale();
     var globalScale = Math.min(scale.X, scale.Y);
 
     var p = label.data('pos');
@@ -174,7 +182,7 @@ function setArrowHeadSize(arrow, s) {
 }
 
 function transformArrow(arrow) {
-    var scale = getScale(arrow);
+    var scale = getScale();
     var lineWidth = 3 * Math.min(scale.X, scale.Y, 1.0); 
     
     var pts = []
@@ -225,7 +233,7 @@ function resizeLabel(ev) {
     if (resize.elem == null) {
         return;
     }
-    var scale = getScale(resize.elem);
+    var scale = getScale();
 
     var curr = ev.clientX;
     var delta = (curr - resize.prev) / scale.X;
@@ -253,7 +261,7 @@ function dragLabel(ev) {
         return;
     }
 
-    var scale = getScale(elem);
+    var scale = getScale();
 
     var curr = point(ev.clientX, ev.clientY);
     var delta = point((curr.X - drag.prev.X) / scale.X, (curr.Y - drag.prev.Y) / scale.Y);

@@ -8,6 +8,7 @@ open Aardvark.Base.Incremental
 open Model
 open Provenance
 open Annotations
+open Thumbnail
 
 // Record containing parameters that influence
 // the rendering of frame slides
@@ -54,27 +55,13 @@ type SlideId =
     override x.ToString () =
         let (SlideId v) = x in string v
 
-// Each slide has a preview thumbnail which
-// is saved as a byte array and passed to Javascript as a base64 string
-type Thumbnail =
-    private Thumbnail of byte [] with
-
-    static member create (data : byte []) =
-        Thumbnail data
-
-    static member empty =
-        Array.empty |> Thumbnail.create
-
-    override x.ToString () =
-        let (Thumbnail d) = x in d |> Convert.ToBase64String
-
 // The slide record
 [<DomainType>]
 type Slide = {
     [<PrimaryKey>]
     id : SlideId
     content : Content 
-    thumbnail : Thumbnail 
+    thumbnail : Thumbnail
 }
 
  // A story is a list of slides and optionally
@@ -90,6 +77,7 @@ type Story = {
 
 type StoryAction =
     | AnnotationAction   of AnnotationAction
+    | ThumbnailAction    of SlideId * ThumbnailAction
     | Forward
     | Backward
     | Commit
@@ -104,16 +92,10 @@ type StoryAction =
     | DeselectSlide
     | MouseEnterSlide    of SlideId
     | MouseLeaveSlide
-    | ThumbnailUpdated   of SlideId * Thumbnail
     | ToggleAnnotations
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Slide =
-
-    let frame (provenance : Provenance) (presentation : PresentationParams) (thumbnail : Thumbnail) =
-        { id = SlideId.generate ()
-          content = FrameContent (Provenance.current provenance, presentation, AnnotationApp.init)
-          thumbnail = thumbnail }
 
     let id (slide : Slide) = slide.id
 
