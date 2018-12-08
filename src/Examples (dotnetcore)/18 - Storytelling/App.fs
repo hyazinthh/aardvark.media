@@ -85,6 +85,7 @@ let update (model : Model) (act : Action) =
             
             model |> Lens.set Model.Lens.appModel s
                   |> Lens.set Model.Lens.provenance p
+                  |> StoryApp.update UpdateFrame
 
         | KeyDown Keys.Z ->
             model |> Lens.update Model.Lens.provenance (ProvenanceApp.update model.story Undo)

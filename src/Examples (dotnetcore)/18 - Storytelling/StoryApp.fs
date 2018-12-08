@@ -24,33 +24,45 @@ module private Helpers =
                 | x -> x
 
             let sel = model.story |> Story.trySelected
-                                  |> Option.map (Lens.update Slide.Lens.content updateContent)
+                                  |> Option.map (Lens.update (Selection.Lens.modified |. Slide.Lens.content) updateContent)
 
-            model |> Lens.update Model.Lens.story (Story.select sel)
+            model |> Lens.set (Model.Lens.story |. Story.Lens.selected) sel
 
+    // Creates a new frame
     let frame (provenance : Provenance) (presentation : PresentationParams) =
         { id = SlideId.generate ()
           content = FrameContent (Provenance.current provenance, presentation, AnnotationApp.init)
           thumbnail = ThumbnailApp.empty }
 
-    // Commits changes to the story
-    let commit (model : Model) =
+    // Updates the frame content of the selected slide
+    let updateFrame (model : Model) =
 
-        let updateFrame (s : Slide) =
-            match s.content with
+        let update (s : Selection) =
+            match s.modified.content with
                 | TextContent _ -> model
                 | FrameContent (_, p, a) ->
                     let s =
                         let n = Provenance.current model.provenance
                         let p = if Model.isAnimating model then p else Model.getPresentation model
+                        let cont = FrameContent (n, p, a)
 
-                        s |> Lens.set Slide.Lens.content (FrameContent (n, p, a))
+                        s |> Lens.set (Selection.Lens.modified |. Slide.Lens.content) cont
+                          |> Some
 
-                    model |> Lens.update Model.Lens.story (Story.select <| Some s)
-                          |> if Model.isAnimating model then id else ThumbnailApp.syncRequest s.id
+                    model |> Lens.set (Model.Lens.story |. Story.Lens.selected) s
+        
+        model.story |> Story.trySelected
+                    |> Option.map update
+                    |> Option.defaultValue model
+
+    // Commits changes to the story
+    let commit (model : Model) =
+
+        let updateThumbnail (s : Selection) =
+            model |> if Model.isAnimating model then id else ThumbnailApp.syncRequest s.current.id
 
         model.story |> Story.trySelected
-                    |> Option.map updateFrame
+                    |> Option.map updateThumbnail
                     |> Option.defaultValue model
                     |> Lens.update Model.Lens.story Story.commit
 
@@ -70,7 +82,7 @@ module private Helpers =
                 model
 
         model.story |> Story.trySelected
-                    |> Option.map (Slide.content >> restoreContent)
+                    |> Option.map (Selection.current >> Slide.content >> restoreContent)
                     |> Option.defaultValue model
 
     let getFrustum (model : MModel) =
@@ -130,6 +142,9 @@ let init = {
 
 let update (msg : StoryAction) (model : Model) =
     match msg with
+        | UpdateFrame ->
+            model |> updateFrame
+
         | AnnotationAction a ->
             model |> Annotations.update a
 
@@ -221,7 +236,15 @@ let overlayView (model : MModel) =
         div [clazz "frame"] [
             i [clazz "huge camera icon"] []
 
-            div [clazz "confirm buttons"] [
+            Incremental.div (AttributeMap.ofAMap <| amap {
+                let! hidden = model.story.selected |> Mod.bind (fun s ->
+                    let s = s.Value
+                    Mod.map2 (=) s.current.Current s.modified.Current
+                )
+
+                yield clazz <| "confirm buttons" + if hidden then " hidden" else ""
+
+            }) <| AList.ofList [
                 i [
                     clazz "huge checkmark icon"
                     onClick' (fun _ -> [Commit; DeselectSlide])
@@ -295,7 +318,7 @@ let overlayView (model : MModel) =
             let! presentation = model.story.presentation
 
             if selected.IsSome then
-                let! cont = selected.Value.content
+                let! cont = selected.Value.modified.content
 
                 match cont with
                     | MFrameContent (_, _, a) ->
@@ -390,7 +413,7 @@ let storyboardView (model : MModel) =
 
             match sel with
                 | None -> return false
-                | Some x -> return! x.id |> Mod.map ((=) id)
+                | Some x -> return! x.current.id |> Mod.map ((=) id)
         }
 
         let highlighted = adaptive {

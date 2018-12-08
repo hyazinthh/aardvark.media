@@ -35,7 +35,7 @@
     pointer-events: auto;
 }
 
-body:hover .render.overlay .frame > .confirm.buttons {
+body:hover .render.overlay .frame > .confirm.buttons:not(.hidden) {
     display: inline-block;
 }
 

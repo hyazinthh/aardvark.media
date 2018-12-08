@@ -64,18 +64,25 @@ type Slide = {
     thumbnail : Thumbnail
 }
 
+[<DomainType>]
+type Selection = {
+    current : Slide
+    modified : Slide
+}
+
  // A story is a list of slides and optionally
  // a currently selected slide with unsaved changes
 [<DomainType>]
 type Story = {
     slides : Slide plist
-    selected : Slide option
+    selected : Selection option
     showAnnotations : bool
     thumbnailRequests : SlideId hset
     presentation : bool
 }
 
 type StoryAction =
+    | UpdateFrame
     | AnnotationAction   of AnnotationAction
     | ThumbnailAction    of SlideId * ThumbnailAction
     | Forward
@@ -111,6 +118,25 @@ module Slide =
         { slide with id = SlideId.generate () }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Selection =
+
+    let current (s : Selection) = s.current
+
+    let modified (s : Selection) = s.modified
+
+    let select (s : Slide) =
+        { current = s; modified = s }
+
+    let commit (s : Selection) =
+        { s with current = s.modified }
+
+    let reset (s : Selection) =
+        { s with modified = s.current }
+
+    let map (f : Slide -> Slide) (s : Selection) =
+        { s with current = f s.current; modified = f s.modified }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Story =
 
     [<AutoOpen>]
@@ -136,7 +162,7 @@ module Story =
             | Some s -> s
 
     let isSelected (slide : Slide) (s : Story) =
-        s.selected |> Option.map (fun s -> s.id = slide.id)
+        s.selected |> Option.map (fun s -> s.current.id = slide.id)
                    |> Option.defaultValue false
 
     let tryFindIndex (slide : Slide) (s : Story) =
@@ -176,8 +202,10 @@ module Story =
     let last (s : Story) =
         s.slides |> PList.tryLast
 
-    let select (sel : Slide option) (s : Story) =
-        { s with selected = sel }
+    let select (slide : Slide option) (s : Story) =
+        match slide with
+            | None -> { s with selected = None }
+            | Some x -> { s with selected = Some <| Selection.select x }
 
     let selectById (id : SlideId option) (s : Story) =
         s |> select (id |> Option.map (fun id -> s |> findById id))
@@ -193,32 +221,32 @@ module Story =
 
     let forward (s : Story) =
         let r = s.selected |> Option.bind (fun x ->
-                    s |> rightOf x
+                    s |> rightOf x.current
                 )
 
-        if r.IsNone then s else { s with selected = r}
+        if r.IsNone then s else s |> select r
 
     let backward (s : Story) =
         let l = s.selected |> Option.bind (fun x ->
-                    s |> leftOf x
+                    s |> leftOf x.current
                 )
 
-        if l.IsNone then s else { s with selected = l}
+        if l.IsNone then s else s |> select l
 
     let append (slide : Slide) (s : Story) =
-        { s with slides = s.slides |> PList.append slide
-                 selected = Some slide }
+        { s with slides = s.slides |> PList.append slide }
+            |> select (Some slide)
 
     let insertBefore (slide : Slide) (before : Slide) (s : Story) =
-        { s with slides = s.slides |> PList.insertBefore (s |> findInList before) slide
-                 selected = Some slide }
+        { s with slides = s.slides |> PList.insertBefore (s |> findInList before) slide }
+            |> select (Some slide)
 
     let insertBeforeById (slide : Slide) (before : SlideId) (s : Story) =
         s |> insertBefore slide (s |> findById before)
 
     let insertAfter (slide : Slide) (after : Slide) (s : Story) =
-        { s with slides = s.slides |> PList.insertAfter (s |> findInList after) slide
-                 selected = Some slide }
+        { s with slides = s.slides |> PList.insertAfter (s |> findInList after) slide }
+            |> select (Some slide)
 
     let insertAfterById (slide : Slide) (after : SlideId) (s : Story) =
         s |> insertAfter slide (s |> findById after)
@@ -242,8 +270,8 @@ module Story =
             | None -> s
             | Some idx -> 
                 { s with slides = s.slides |> PList.update idx f 
-                         selected = s.selected |> Option.filter (fun s -> s.id = id) 
-                                               |> Option.map f }
+                         selected = s.selected |> Option.filter (fun s -> s.current.id = id)
+                                               |> Option.map (Selection.map f) }
 
     let moveBefore (slide : Slide) (before : Slide) (s : Story) =
         { s with slides = s.slides |> PList.remove (s |> findInList slide)
@@ -266,13 +294,14 @@ module Story =
     let commit (s : Story) =
         match s.selected with
             | None -> s 
-            | Some sel -> { s with slides = s.slides |> PList.set (s |> findInList sel) sel }
+            | Some sel -> { s with slides = s.slides |> PList.set (s |> findInList sel.modified) sel.modified
+                                   selected = Some <| Selection.commit sel }
 
     // Resets changes made to the selected slide
     let reset (s : Story) =
         match s.selected with
             | None -> s
-            | Some sel -> { s with selected = s |> findById sel.id |> Some }
+            | Some sel -> { s with selected = Some <| Selection.reset sel }
 
     let isNodeReferenced (node : Node) (ignoreSelected : bool) (s : Story) =
         s.slides |> PList.tryFind (fun x ->
