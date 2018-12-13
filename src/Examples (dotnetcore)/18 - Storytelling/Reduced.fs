@@ -19,7 +19,7 @@ type CameraView = {
     right : V3d
 }
 
-type OMessage = BoxSelectionAction
+type OMessage = AppAction
 
 [<DomainType>]
 type Message =
