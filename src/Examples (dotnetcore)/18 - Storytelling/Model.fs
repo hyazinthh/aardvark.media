@@ -80,3 +80,6 @@ module Model =
 
     let isAnimating (model : Model) =
         model.animation.model |> AnimationApp.shouldAnimate
+
+    let isPreview (model : Model) =
+        model.provenance.preview |> Option.isSome

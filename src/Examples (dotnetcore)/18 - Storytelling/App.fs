@@ -79,7 +79,7 @@ let update (model : Model) (act : Action) =
         | SessionAction a ->
             model |> SessionApp.update a
 
-        | AppAction a when not (Model.isAnimating model) ->
+        | AppAction a when not (Model.isAnimating model || Model.isPreview model) ->
             let s = BoxSelectionApp.update model.appModel a
             let p = model.provenance |> ProvenanceApp.update model.story (Update (s, a))
             
